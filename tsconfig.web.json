@@ -1,0 +1,30 @@
+{
+  "compilerOptions": {
+    "composite": true,
+    "tsBuildInfoFile": "out/tsconfig.web.tsbuildinfo",
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "target": "ES2022",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "jsx": "react-jsx",
+    "strict": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noFallthroughCasesInSwitch": true,
+    "resolveJsonModule": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "useDefineForClassFields": true,
+    "baseUrl": ".",
+    "paths": {
+      "@shared/*": ["src/shared/*"],
+      "@/*": ["src/renderer/src/*"]
+    }
+  },
+  "include": [
+    "src/renderer/src/**/*",
+    "src/renderer/src/**/*.tsx",
+    "src/shared/**/*"
+  ]
+}
