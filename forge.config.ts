@@ -6,6 +6,11 @@ import { MakerDeb } from '@electron-forge/maker-deb'
 import { MakerRpm } from '@electron-forge/maker-rpm'
 import { PublisherGithub } from '@electron-forge/publisher-github'
 import { resolve } from 'node:path'
+import { config as loadEnv } from 'dotenv'
+
+// Load GITHUB_TOKEN from .env (gitignored) so you don't have to export it
+// in every new terminal session. Harmless if .env doesn't exist.
+loadEnv()
 
 const iconPath = resolve(__dirname, 'build', 'icon')
 
@@ -62,7 +67,7 @@ const config: ForgeConfig = {
     // Repo + token come from env (see scripts/release.sh).
     new PublisherGithub({
       repository: {
-        owner: 'datasiberLab',
+        owner: 'candrapwr',
         name: 'siberllm'
       },
       draft: true, // create as draft so you can review before going public
