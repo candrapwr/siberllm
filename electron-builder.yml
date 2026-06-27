@@ -1,0 +1,57 @@
+appId: com.datasiberlab.siberllm
+productName: SiberLLM
+directories:
+  buildResources: build
+  output: dist
+asar: true
+files:
+  - out/**/*
+  - package.json
+  - "!**/node_modules/*/{CHANGELOG.md,README.md,readme}"
+  - "!**/node_modules/*/{test,__tests__,tests,docs,example,examples}"
+  - "!**/*.{md,markdown}"
+  - "!**/.{idea,git,cache,vscode,DS_Store}"
+
+# Publish ke GitHub Releases. GH_TOKEN/GITHUB_TOKEN env wajib di-set.
+publish:
+  provider: github
+  owner: candrapwr
+  repo: siberllm
+
+mac:
+  category: public.app-category.developer-tools
+  # unsigned build for dev/local distribution. For public distribution, set
+  # these env vars + have a "Developer ID Application" cert, then uncomment:
+  #   identity: "Developer ID Application: candrapwr"
+  #   notarize:
+  #     teamId: ${APPLE_TEAM_ID}
+  #   hardenedRuntime: true
+  #   entitlements: build/entitlements.mac.plist
+  #   entitlementsInherit: build/entitlements.mac.plist
+  target:
+    - dmg
+  icon: build/icon.icns
+
+win:
+  target:
+    - nsis
+  icon: build/icon.ico
+
+linux:
+  target:
+    - AppImage
+  icon: build/icon.png
+  category: Development
+
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+
+dmg:
+  contents:
+    - x: 130
+      y: 220
+    - x: 410
+      y: 220
+      type: link
+      path: /Applications
