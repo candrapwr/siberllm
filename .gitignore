@@ -1,6 +1,9 @@
 # dependencies
 node_modules/
 
+# secrets — NEVER commit
+.env
+
 # build output
 out/
 dist/

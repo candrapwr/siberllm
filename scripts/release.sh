@@ -72,7 +72,7 @@ if [[ "$PUBLISH" -eq 1 ]]; then
   info "Build + publish draft release ke GitHub…"
   npm run publish
   ok "Draft release v${VERSION} dibuat di GitHub. Cek & publikasikan manual."
-  warn "Lihat: https://github.com/datasiberLab/siberllm/releases"
+  warn "Lihat: https://github.com/candrapwr/siberllm/releases"
 else
   info "Build artifacts lokal (dmg/zip)…"
   npm run make
