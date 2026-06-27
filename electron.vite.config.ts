@@ -2,8 +2,8 @@ import { resolve } from 'node:path'
 import { defineConfig, externalizeDepsPlugin } from 'electron-vite'
 import react from '@vitejs/plugin-react'
 
-// electron-vite outputs to <root>/dist by default. We keep it there so it
-// doesn't collide with electron-forge's output folder (out/).
+// electron-vite outputs to <root>/out/{main,preload,renderer} by default.
+// This matches electron-builder's `files: out/**/*` glob (see electron-builder.yml).
 export default defineConfig({
   main: {
     plugins: [externalizeDepsPlugin()],
@@ -11,8 +11,6 @@ export default defineConfig({
       alias: { '@shared': resolve('src/shared') }
     },
     build: {
-      outDir: 'dist/main',
-      emptyOutDir: true,
       // Electron's main process must be CommonJS: it relies on __dirname and
       // must be require()-able by the Electron runtime.
       rollupOptions: {
@@ -31,8 +29,6 @@ export default defineConfig({
       alias: { '@shared': resolve('src/shared') }
     },
     build: {
-      outDir: 'dist/preload',
-      emptyOutDir: true,
       rollupOptions: {
         external: ['electron'],
         output: {
@@ -52,8 +48,6 @@ export default defineConfig({
       }
     },
     build: {
-      outDir: 'dist/renderer',
-      emptyOutDir: true,
       rollupOptions: {
         input: { index: resolve('src/renderer/index.html') }
       }

@@ -4,7 +4,7 @@
   "description": "SiberLLM — desktop layer UI for running llama.cpp as an OpenAI-compatible API server.",
   "author": "datasiberLab <candrapwr@datasiber.com>",
   "license": "MIT",
-  "main": "dist/main/index.js",
+  "main": "out/main/index.js",
   "scripts": {
     "dev": "electron-vite dev",
     "build": "electron-vite build",
@@ -13,13 +13,14 @@
     "typecheck:web": "tsc --noEmit -p tsconfig.web.json --composite false",
     "typecheck": "npm run typecheck:node && npm run typecheck:web",
     "icons": "./scripts/build-icons.sh",
-    "package": "electron-vite build && electron-forge package",
-    "make": "electron-vite build && electron-forge make",
-    "make:dmg": "electron-vite build && electron-forge make --targets=dmg",
-    "make:mac": "electron-vite build && electron-forge make --platform=darwin",
-    "make:win": "electron-vite build && electron-forge make --platform=win32",
-    "make:linux": "electron-vite build && electron-forge make --platform=linux",
-    "publish": "electron-vite build && electron-forge publish"
+    "package": "electron-vite build && electron-builder",
+    "package:mac": "electron-vite build && electron-builder --mac",
+    "package:win": "electron-vite build && electron-builder --win",
+    "package:linux": "electron-vite build && electron-builder --linux",
+    "release:mac": "electron-vite build && electron-builder --mac --publish always",
+    "release:win": "electron-vite build && electron-builder --win --publish always",
+    "release:linux": "electron-vite build && electron-builder --linux --publish always",
+    "release": "electron-vite build && electron-builder --publish always"
   },
   "dependencies": {
     "clsx": "^2.1.1",
@@ -29,13 +30,6 @@
     "zustand": "^5.0.2"
   },
   "devDependencies": {
-    "@electron-forge/cli": "^7.6.1",
-    "@electron-forge/maker-deb": "^7.6.1",
-    "@electron-forge/maker-dmg": "^7.11.2",
-    "@electron-forge/maker-rpm": "^7.6.1",
-    "@electron-forge/maker-squirrel": "^7.6.1",
-    "@electron-forge/maker-zip": "^7.6.1",
-    "@electron-forge/publisher-github": "^7.11.2",
     "@types/node": "^22.10.2",
     "@types/react": "^19.0.2",
     "@types/react-dom": "^19.0.2",
@@ -43,6 +37,7 @@
     "autoprefixer": "^10.4.20",
     "dotenv": "^17.4.2",
     "electron": "^33.3.1",
+    "electron-builder": "^26.15.3",
     "electron-vite": "^2.3.0",
     "postcss": "^8.4.49",
     "react": "^19.0.0",
