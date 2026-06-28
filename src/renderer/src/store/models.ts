@@ -20,6 +20,7 @@ interface ModelsStore {
   loadCatalog: () => Promise<void>
   search: (q: string) => Promise<void>
   download: (repo: string, file: string) => Promise<void>
+  cancel: (repo: string, file: string) => Promise<void>
   remove: (path: string) => Promise<void>
 }
 
@@ -57,6 +58,35 @@ export const useModelsStore = create<ModelsStore>((set, get) => ({
     }
   },
 
+  cancel: async (repo, file) => {
+    try {
+      await api.models.cancelDownload(repo, file)
+    } catch {
+      /* ignore — the progress/error event will update state */
+    }
+    // optimistically mark as cancelled so the UI updates instantly
+    set((s) => {
+      const cur = s.downloading[key(repo, file)]
+      if (!cur || cur.state === 'downloading') {
+        return {
+          downloading: {
+            ...s.downloading,
+            [key(repo, file)]: { ...cur, state: 'cancelled' as const, percent: cur?.percent ?? 0 }
+          }
+        }
+      }
+      return {}
+    })
+    // clear after a short delay
+    setTimeout(() => {
+      set((s) => {
+        const next = { ...s.downloading }
+        delete next[key(repo, file)]
+        return { downloading: next }
+      })
+    }, 2000)
+  },
+
   download: async (repo, file) => {
     set({ error: null })
     // mark as downloading immediately so the UI shows a spinner before the
@@ -77,12 +107,20 @@ export const useModelsStore = create<ModelsStore>((set, get) => ({
     }))
     try {
       const scan = await api.models.download(repo, file)
-      // keep the "done" state visible briefly so the user sees 100%, then clear.
+      // Only mark "done" if the download wasn't cancelled mid-flight.
+      // The cancel action sets state='cancelled'; if we overwrite that with
+      // 'done' here, the UI would falsely show "100% success".
+      const k = key(repo, file)
+      const current = get().downloading[k]
+      if (current && current.state === 'cancelled') {
+        set({ scan })
+        return
+      }
       set((s) => ({
         scan,
         downloading: {
           ...s.downloading,
-          [key(repo, file)]: {
+          [k]: {
             repo,
             file,
             percent: 100,
@@ -131,3 +169,31 @@ api.models.onDownloadProgress((p) =>
   }))
 )
 api.models.onDownloadDone(() => useModelsStore.getState().refresh())
+api.models.onDownloadError(({ repo, file, cancelled }) => {
+  if (cancelled) {
+    // cancellation is handled by the `cancel` action; just refresh the list.
+    useModelsStore.getState().refresh()
+    return
+  }
+  useModelsStore.setState((s) => ({
+    downloading: {
+      ...s.downloading,
+      [key(repo, file)]: {
+        repo,
+        file,
+        percent: 0,
+        bytesLoaded: 0,
+        bytesTotal: 0,
+        bytesPerSec: 0,
+        state: 'error'
+      }
+    }
+  }))
+  setTimeout(() => {
+    useModelsStore.setState((s) => {
+      const next = { ...s.downloading }
+      delete next[key(repo, file)]
+      return { downloading: next }
+    })
+  }, 4000)
+})

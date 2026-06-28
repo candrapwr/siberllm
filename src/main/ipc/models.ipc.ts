@@ -10,7 +10,9 @@ import {
   importModelFiles,
   searchHuggingFace,
   listRepoFiles,
-  downloadHfFile
+  downloadHfFile,
+  cancelDownload,
+  DownloadCancelledError
 } from '../services/model-manager'
 
 export function registerModelsIpc(getMainWindow: () => BrowserWindow | null): void {
@@ -66,11 +68,34 @@ export function registerModelsIpc(getMainWindow: () => BrowserWindow | null): vo
       win?.webContents.send(IPC.MODELS_DOWNLOAD_DONE, { repo, file })
       return await scanLocalModels()
     } catch (err) {
-      const message = err instanceof Error ? err.message : String(err)
-      win?.webContents.send(IPC.MODELS_DOWNLOAD_ERROR, { repo, file, message })
-      throw err
+      // Cancellation is a deliberate user action — emit a distinct event so
+      // the UI can show "cancelled" rather than a generic error. Both cancel
+      // and normal errors are swallowed here (reported via event, not thrown)
+      // so the main-process console doesn't fill with noisy stack traces.
+      const cancelled =
+        err instanceof DownloadCancelledError ||
+        (err instanceof Error && err.name === 'AbortError')
+      const message = cancelled
+        ? 'Download dibatalkan.'
+        : err instanceof Error
+          ? err.message
+          : String(err)
+      win?.webContents.send(IPC.MODELS_DOWNLOAD_ERROR, {
+        repo,
+        file,
+        message,
+        cancelled
+      })
+      // Resolve normally — the UI updates its state from the error event.
+      return await scanLocalModels()
     }
   })
+
+  // Cancel an in-flight model download.
+  ipcMain.handle(
+    IPC.MODELS_CANCEL_DOWNLOAD,
+    async (_evt, repo: string, file: string) => cancelDownload(repo, file)
+  )
 
   // Helper: list gguf files for a repo (used by the custom-HF-repo flow).
   ipcMain.handle(IPC.MODELS_LIST_REPO, async (_evt, repo: string) =>
