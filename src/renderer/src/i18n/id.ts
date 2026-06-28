@@ -1,0 +1,176 @@
+// Bahasa Indonesia — default language.
+
+export const id = {
+  // ---- sidebar / nav ----
+  app: {
+    name: 'SiberLLM',
+    engine: 'engine',
+    ready: 'siap',
+    notInstalled: 'belum terpasang',
+    backend: 'backend'
+  },
+  nav: {
+    setup: 'Setup',
+    models: 'Model',
+    run: 'Run',
+    logs: 'Logs',
+    settings: 'Settings',
+    lockedHint: 'Pasang engine llama.cpp di tab Setup dulu'
+  },
+
+  // ---- setup ----
+  setup: {
+    tagline: 'Layer untuk menjalankan llama.cpp sebagai server API OpenAI-compatible.',
+    checkingEngine: 'Memeriksa engine…',
+    title: 'Engine llama.cpp',
+    installed: 'Terpasang',
+    notInstalled: 'Belum terpasang',
+    desc: 'SiberLLM akan mengunduh binary llama-server dari rilis resmi ggml-org/llama.cpp sesuai platform Anda.',
+    status: 'Status',
+    backend: 'Backend',
+    path: 'Path',
+    notInstalledStatus: 'Belum terpasang',
+    gpuBackend: 'Backend GPU',
+    autoDetect: 'Auto-detect (rekomendasi)',
+    metal: 'Metal',
+    cpu: 'CPU',
+    cuda: 'CUDA (NVIDIA)',
+    vulkan: 'Vulkan',
+    rocm: 'ROCm (AMD)',
+    stages: {
+      idle: 'Menunggu',
+      detecting: 'Mendeteksi sistem…',
+      'fetching-release': 'Mengambil info rilis…',
+      downloading: 'Mengunduh binary',
+      extracting: 'Mengekstrak',
+      finalizing: 'Menyiapkan',
+      done: 'Selesai',
+      error: 'Gagal'
+    },
+    installBtn: 'Pasang llama.cpp',
+    processing: 'Memproses…',
+    recheck: 'Periksa ulang',
+    next: 'Lanjut →',
+    openFolder: 'Buka folder 📂'
+  },
+
+  // ---- models ----
+  models: {
+    title: 'Model',
+    desc: 'Kelola file .gguf lokal atau unduh dari HuggingFace.',
+    tabLocal: 'Lokal',
+    tabDownload: 'Unduh',
+    detected: '{{count}} file .gguf terdeteksi',
+    importFile: '+ Import file',
+    addFolder: '+ Tambah folder',
+    refresh: 'Refresh',
+    copying: 'Menyalin…',
+    picking: 'Memilih…',
+    sectionModel: 'Model ({{count}})',
+    sectionMmproj: 'Projector / mmproj ({{count}})',
+    emptyLocal: 'Belum ada model. Klik tombol Import file / Tambah folder di atas, atau pindah ke tab Unduh.',
+    remove: 'Hapus',
+    local: 'lokal',
+    installPrompt: 'Pasang dulu engine llama.cpp di halaman Setup.',
+    catalogTitle: 'Katalog populer',
+    searchTitle: 'Cari di HuggingFace',
+    searchPlaceholder: 'cth: qwen2.5 gguf, llama 3.2 vision…',
+    search: 'Cari',
+    searching: 'Mencari…',
+    searchingFiles: 'Mengambil daftar file & ukuran dari HuggingFace…',
+    downloads: '{{count}} unduhan',
+    likes: '{{count}} suka',
+    viewFiles: 'Lihat file',
+    hideFiles: 'Sembunyikan',
+    loadingFiles: 'Memuat…',
+    noFiles: 'Tidak ada file .gguf di repo ini (atau gagal memuat).',
+    download: 'Unduh',
+    downloading2: 'Mengunduh…',
+    sizeUnknown: 'ukuran ?',
+    text: 'text',
+    multimodal: 'multimodal',
+    mmproj: 'mmproj',
+    catalogDownloading: 'Mengunduh…'
+  },
+
+  // ---- run ----
+  run: {
+    title: 'Jalankan Server',
+    desc: 'Start llama-server sebagai API OpenAI-compatible.',
+    config: 'Konfigurasi',
+    configDesc: 'Pilih model dan parameter server.',
+    selectModel: '— pilih model —',
+    model: 'Model (.gguf)',
+    mmproj: 'mmproj (untuk model multimodal)',
+    mmprojHintAuto: 'Saran otomatis: {{name}}',
+    mmprojHintNone: 'Kosongkan jika model text-only.',
+    noMmproj: '— tidak ada —',
+    host: 'Host',
+    port: 'Port',
+    gpuLayers: 'GPU layers',
+    gpuLayersHint: '-1 = semua ke GPU',
+    contextSize: 'Context size',
+    extraArgs: 'Argumen tambahan',
+    extraArgsHint: 'cth: --jinja --flash-attn',
+    server: 'Server',
+    serverDesc: 'Status & akses endpoint.',
+    start: 'Start',
+    starting: 'Memulai…',
+    stop: 'Stop',
+    startingMsg: 'Memulai server…',
+    startingDesc: 'Memuat model ke memori & menunggu server siap. Untuk model besar proses ini bisa beberapa puluh detik. Lihat progres di tab Logs.',
+    serverReady: 'Server siap di',
+    openWebUi: 'Buka Web UI ↗',
+    openEndpoint: 'Buka endpoint OpenAI ↗',
+    serverError: 'Server gagal. Lihat tab Logs untuk detail.',
+    selectModelFirst: 'Pilih model dulu sebelum menjalankan server.'
+  },
+
+  // ---- logs ----
+  logs: {
+    title: 'Log Server',
+    desc: 'Output real-time dari llama-server.',
+    clear: 'Bersihkan',
+    empty: 'Belum ada output. Jalankan server di tab Run.',
+    stopped: 'berhenti'
+  },
+
+  // ---- settings ----
+  settings: {
+    title: 'Pengaturan',
+    desc: 'Default server & preferensi engine.',
+    engine: 'Engine',
+    engineDesc: 'Backend GPU yang dipakai saat memasang binary.',
+    backend: 'Backend',
+    backendHint: 'macOS selalu memakai Metal.',
+    detected: 'Terdeteksi:',
+    defaultServer: 'Default Server',
+    defaultServerDesc: 'Nilai awal saat menjalankan server baru.',
+    storageLocation: 'Lokasi Penyimpanan',
+    storageDesc: 'Buka folder tempat binary engine, model, dan log disimpan.',
+    engineFolder: 'Engine 📂',
+    modelFolder: 'Model 📂',
+    logFolder: 'Log 📂',
+    rootFolder: 'Root 📂',
+    extraModelFolders: 'Folder Model Tambahan',
+    extraFoldersDesc: 'Folder (selain default) yang ikut di-scan untuk file .gguf.',
+    noExtraFolders: 'Belum ada folder tambahan.',
+    removeFolder: 'Hapus',
+    about: 'Tentang',
+    aboutDesc: 'SiberLLM — by datasiberLab.',
+    madeBy: 'Dibuat oleh:',
+    contact: 'Kontak:',
+    aboutText: 'SiberLLM adalah layer UI di atas llama.cpp untuk menjalankan model AI secara lokal & privat.',
+    save: 'Simpan',
+    saved: 'Tersimpan ✓'
+  },
+
+  // ---- language switcher ----
+  lang: {
+    label: 'Bahasa',
+    id: 'Indonesia',
+    en: 'English'
+  }
+}
+
+export default id

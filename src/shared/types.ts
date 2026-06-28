@@ -61,6 +61,13 @@ export interface ModelDownloadProgress {
   message?: string
 }
 
+export interface RepoFile {
+  name: string
+  sizeBytes: number
+  isMmproj: boolean
+  multimodal: boolean
+}
+
 // ----------------------------- server -----------------------------
 
 export interface ServerConfig {

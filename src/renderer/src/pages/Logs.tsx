@@ -1,10 +1,12 @@
 import { useEffect, useRef } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useServerStore } from '../store/server'
 import { Button } from '../components/ui/Button'
 import { Badge } from '../components/ui/Badge'
 import { formatTime } from '../lib/format'
 
 export default function Logs() {
+  const { t } = useTranslation()
   const { logs, state, clearLogs } = useServerStore()
   const endRef = useRef<HTMLDivElement>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
@@ -27,15 +29,15 @@ export default function Logs() {
     <div className="flex h-full flex-col">
       <header className="flex items-center justify-between border-b border-border px-6 py-4">
         <div>
-          <h2 className="text-lg font-semibold">Log Server</h2>
-          <p className="text-xs text-muted-foreground">Output real-time dari llama-server.</p>
+          <h2 className="text-lg font-semibold">{t('logs.title')}</h2>
+          <p className="text-xs text-muted-foreground">{t('logs.desc')}</p>
         </div>
         <div className="flex items-center gap-2">
           <Badge tone={state?.status === 'running' ? 'success' : 'default'}>
-            {state?.status ?? 'stopped'}
+            {state?.status ?? t('logs.stopped')}
           </Badge>
           <Button size="sm" variant="outline" onClick={clearLogs}>
-            Bersihkan
+            {t('logs.clear')}
           </Button>
         </div>
       </header>
@@ -46,9 +48,7 @@ export default function Logs() {
         className="flex-1 overflow-y-auto bg-[#0a0e16] p-4 font-mono text-xs leading-relaxed"
       >
         {logs.length === 0 ? (
-          <p className="text-muted-foreground/60">
-            Belum ada output. Jalankan server di tab Run.
-          </p>
+          <p className="text-muted-foreground/60">{t('logs.empty')}</p>
         ) : (
           logs.map((l, i) => (
             <div key={i} className="flex gap-2">

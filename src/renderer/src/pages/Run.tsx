@@ -1,4 +1,5 @@
 import { useEffect } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useServerStore } from '../store/server'
 import { useModelsStore } from '../store/models'
 import { api } from '../lib/api'
@@ -17,6 +18,7 @@ const STATUS_TONE: Record<ServerStatus, 'default' | 'success' | 'warning' | 'dan
 }
 
 export default function Run() {
+  const { t } = useTranslation()
   const { state, config, setConfig, start, stop, refresh } = useServerStore()
   const scan = useModelsStore((s) => s.scan)
   const refreshModels = useModelsStore((s) => s.refresh)
@@ -44,9 +46,9 @@ export default function Run() {
       <header className="border-b border-border px-6 py-4">
         <div className="flex items-center justify-between">
           <div>
-            <h2 className="text-lg font-semibold">Jalankan Server</h2>
+            <h2 className="text-lg font-semibold">{t('run.title')}</h2>
             <p className="text-xs text-muted-foreground">
-              Start <code>llama-server</code> sebagai API OpenAI-compatible.
+              Start <code>llama-server</code> {t('run.desc')}
             </p>
           </div>
           <Badge tone={STATUS_TONE[status]}>{status}</Badge>
@@ -58,11 +60,11 @@ export default function Run() {
           {/* ---- config form ---- */}
           <Card>
             <CardHeader>
-              <CardTitle>Konfigurasi</CardTitle>
-              <CardDescription>Pilih model dan parameter server.</CardDescription>
+              <CardTitle>{t('run.config')}</CardTitle>
+              <CardDescription>{t('run.configDesc')}</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <Field label="Model (.gguf)">
+              <Field label={t('run.model')}>
                 <Select
                   value={config.modelPath}
                   onChange={(e) => {
@@ -70,7 +72,7 @@ export default function Run() {
                     setConfig({ modelPath: path, mmprojPath: undefined })
                   }}
                 >
-                  <option value="">— pilih model —</option>
+                  <option value="">{t('run.selectModel')}</option>
                   {models.map((m) => (
                     <option key={m.path} value={m.path}>
                       {m.name}
@@ -80,18 +82,18 @@ export default function Run() {
               </Field>
 
               <Field
-                label="mmproj (untuk model multimodal)"
+                label={t('run.mmproj')}
                 hint={
                   autoMmproj
-                    ? `Saran otomatis: ${autoMmproj.name}`
-                    : 'Kosongkan jika model text-only.'
+                    ? t('run.mmprojHintAuto', { name: autoMmproj.name })
+                    : t('run.mmprojHintNone')
                 }
               >
                 <Select
                   value={config.mmprojPath ?? ''}
                   onChange={(e) => setConfig({ mmprojPath: e.target.value || undefined })}
                 >
-                  <option value="">— tidak ada —</option>
+                  <option value="">{t('run.noMmproj')}</option>
                   {mmproj.map((m) => (
                     <option key={m.path} value={m.path}>
                       {m.name}
@@ -101,13 +103,13 @@ export default function Run() {
               </Field>
 
               <div className="grid grid-cols-2 gap-3">
-                <Field label="Host">
+                <Field label={t('run.host')}>
                   <Input
                     value={config.host}
                     onChange={(e) => setConfig({ host: e.target.value })}
                   />
                 </Field>
-                <Field label="Port">
+                <Field label={t('run.port')}>
                   <Input
                     type="number"
                     value={config.port}
@@ -117,14 +119,14 @@ export default function Run() {
               </div>
 
               <div className="grid grid-cols-2 gap-3">
-                <Field label="GPU layers" hint="-1 = semua ke GPU">
+                <Field label={t('run.gpuLayers')} hint={t('run.gpuLayersHint')}>
                   <Input
                     type="number"
                     value={config.gpuLayers}
                     onChange={(e) => setConfig({ gpuLayers: Number(e.target.value) })}
                   />
                 </Field>
-                <Field label="Context size">
+                <Field label={t('run.contextSize')}>
                   <Input
                     type="number"
                     value={config.contextSize}
@@ -133,7 +135,7 @@ export default function Run() {
                 </Field>
               </div>
 
-              <Field label="Argumen tambahan" hint="cth: --jinja --flash-attn">
+              <Field label={t('run.extraArgs')} hint={t('run.extraArgsHint')}>
                 <Input
                   value={config.extraArgs}
                   onChange={(e) => setConfig({ extraArgs: e.target.value })}
@@ -145,23 +147,23 @@ export default function Run() {
           {/* ---- run panel ---- */}
           <Card>
             <CardHeader>
-              <CardTitle>Server</CardTitle>
-              <CardDescription>Status & akses endpoint.</CardDescription>
+              <CardTitle>{t('run.server')}</CardTitle>
+              <CardDescription>{t('run.serverDesc')}</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="flex gap-2">
                 {!running && (
                   <Button onClick={() => start()} disabled={busy || !config.modelPath}>
-                    {busy ? 'Memulai…' : 'Start'}
+                    {busy ? t('run.starting') : t('run.start')}
                   </Button>
                 )}
                 {(running || busy) && (
                   <Button variant="destructive" onClick={() => stop()} disabled={false}>
-                    Stop
+                    {t('run.stop')}
                   </Button>
                 )}
                 <Button variant="outline" onClick={() => refresh()} disabled={busy}>
-                  Refresh
+                  {t('models.refresh')}
                 </Button>
               </div>
 
@@ -169,26 +171,21 @@ export default function Run() {
                 <div className="space-y-2 rounded-md border border-amber-500/30 bg-amber-500/5 p-4">
                   <div className="flex items-center gap-2">
                     <Spinner size={16} />
-                    <p className="text-sm font-medium text-amber-400">
-                      Memulai server…
-                    </p>
+                    <p className="text-sm font-medium text-amber-400">{t('run.startingMsg')}</p>
                   </div>
-                  <p className="text-xs text-muted-foreground">
-                    Memuat model ke memori & menunggu server siap. Untuk model
-                    besar proses ini bisa beberapa puluh detik. Lihat progres di tab Logs.
-                  </p>
+                  <p className="text-xs text-muted-foreground">{t('run.startingDesc')}</p>
                 </div>
               )}
 
               {running && state?.url && (
                 <div className="space-y-3 rounded-md border border-border bg-background/40 p-4">
                   <div>
-                    <p className="text-xs text-muted-foreground">Server siap di</p>
+                    <p className="text-xs text-muted-foreground">{t('run.serverReady')}</p>
                     <p className="font-mono text-sm text-emerald-400">{state.url}</p>
                   </div>
                   <div className="grid gap-2">
                     <Button size="sm" onClick={() => api.openExternal(`${state.url}/`)}>
-                      Buka Web UI ↗
+                      {t('run.openWebUi')}
                     </Button>
                     <Button
                       size="sm"
@@ -197,7 +194,7 @@ export default function Run() {
                         api.openExternal(`${state.url}/v1/chat/completions`)
                       }
                     >
-                      Buka endpoint OpenAI ↗
+                      {t('run.openEndpoint')}
                     </Button>
                   </div>
                   <div className="rounded-md bg-background/60 p-2 font-mono text-[11px] text-muted-foreground">
@@ -212,14 +209,12 @@ export default function Run() {
 
               {status === 'error' && (
                 <div className="rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">
-                  Server gagal. Lihat tab Logs untuk detail.
+                  {t('run.serverError')}
                 </div>
               )}
 
               {!config.modelPath && !running && (
-                <p className="text-xs text-muted-foreground">
-                  Pilih model dulu sebelum menjalankan server.
-                </p>
+                <p className="text-xs text-muted-foreground">{t('run.selectModelFirst')}</p>
               )}
             </CardContent>
           </Card>

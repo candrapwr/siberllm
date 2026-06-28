@@ -2,6 +2,9 @@ import { useEffect } from 'react'
 import type { ReactElement } from 'react'
 import { NavLink, Navigate, Route, Routes, useLocation } from 'react-router-dom'
 import { useInstallStore } from './store/install'
+import { api } from './lib/api'
+import { useTranslation } from 'react-i18next'
+import { LanguageSwitcher } from './components/LanguageSwitcher'
 import logo from './assets/logo.png'
 import Setup from './pages/Setup'
 import Models from './pages/Models'
@@ -13,22 +16,24 @@ import { cn } from './lib/utils'
 // Routes always accessible regardless of engine install state.
 const OPEN_ROUTES = new Set(['/setup', '/settings'])
 
-const NAV = [
-  { to: '/setup', label: 'Setup', icon: '⚙' },
-  { to: '/models', label: 'Model', icon: '◇' },
-  { to: '/run', label: 'Run', icon: '▶' },
-  { to: '/logs', label: 'Logs', icon: '≡' },
-  { to: '/settings', label: 'Settings', icon: '✦' }
-]
-
 export default function App() {
   const { status, refresh } = useInstallStore()
+  const { t } = useTranslation()
 
   useEffect(() => {
     void refresh()
   }, [refresh])
 
   const installed = status?.installed ?? false
+
+  // Build the nav from translations so labels switch with the language.
+  const NAV = [
+    { to: '/setup', label: t('nav.setup'), icon: '⚙' },
+    { to: '/models', label: t('nav.models'), icon: '◇' },
+    { to: '/run', label: t('nav.run'), icon: '▶' },
+    { to: '/logs', label: t('nav.logs'), icon: '≡' },
+    { to: '/settings', label: t('nav.settings'), icon: '✦' }
+  ]
 
   return (
     <div className="flex h-screen w-screen overflow-hidden bg-background text-foreground">
@@ -42,13 +47,16 @@ export default function App() {
           <span className="hidden text-sm font-semibold lg:inline">SiberLLM</span>
         </div>
 
+        {/* Language switcher — visible at the top of the sidebar */}
+        <LanguageSwitcher />
+
         <nav className="flex flex-1 flex-col gap-1">
           {NAV.map((n) => {
             // A route is gated (locked) when it needs the engine but the
             // engine is not installed yet. Setup & Settings stay open.
             const locked = !OPEN_ROUTES.has(n.to) && !installed
             return (
-              <NavItem key={n.to} item={n} locked={locked} />
+              <NavItem key={n.to} item={n} locked={locked} lockedHint={t('nav.lockedHint')} />
             )
           })}
         </nav>
@@ -57,16 +65,19 @@ export default function App() {
           {status && (
             <div className="mb-3">
               <p>
-                engine:{' '}
+                {t('app.engine')}:{' '}
                 <span className={installed ? 'text-emerald-400' : 'text-amber-400'}>
-                  {installed ? 'ready' : 'not installed'}
+                  {installed ? t('app.ready') : t('app.notInstalled')}
                 </span>
               </p>
-              <p>backend: {status.backend ?? 'auto'}</p>
+              <p>{t('app.backend')}: {status.backend ?? 'auto'}</p>
               {status.version && <p>v{status.version}</p>}
             </div>
           )}
-          <p className="font-medium text-foreground/80">© datasiberLab</p>
+          <p className="font-medium text-foreground/80">
+            SiberLLM <span className="text-muted-foreground">v{api.env.appVersion}</span>
+          </p>
+          <p className="text-muted-foreground/70">© datasiberLab</p>
           <p className="text-muted-foreground/70">candrapwr@datasiber.com</p>
         </div>
       </aside>
@@ -99,10 +110,12 @@ export default function App() {
 
 function NavItem({
   item,
-  locked
+  locked,
+  lockedHint
 }: {
   item: { to: string; label: string; icon: string }
   locked: boolean
+  lockedHint: string
 }) {
   // Locked items render as a non-navigating element so they can't be clicked,
   // tabbed-to, or otherwise activated. Unlocked items are real NavLinks.
@@ -110,7 +123,7 @@ function NavItem({
     return (
       <span
         aria-disabled
-        title="Pasang engine llama.cpp di tab Setup dulu"
+        title={lockedHint}
         className="flex cursor-not-allowed items-center gap-3 rounded-md px-3 py-2 text-sm text-muted-foreground/40"
       >
         <span className="w-4 text-center text-base">{item.icon}</span>

@@ -49,7 +49,7 @@ const stub: SiberLLMApi = {
   settings: { get: noop, set: noop },
   openExternal: noop,
   openPath: noop,
-  env: { platform: 'linux' }
+  env: { platform: 'linux', appVersion: '0.0.0' }
 }
 
 // window may be undefined in non-browser environments.
