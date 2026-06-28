@@ -14,6 +14,37 @@ import type { LocalModel, ScanResult, ModelDownloadProgress, RepoFile } from '@s
 
 const MMPROJ_HINT = /mmproj/i
 
+/** Custom error thrown when a download is cancelled by the user. */
+export class DownloadCancelledError extends Error {
+  constructor(message = 'Download dibatalkan.') {
+    super(message)
+    this.name = 'DownloadCancelledError'
+  }
+}
+
+/** Active AbortControllers keyed by `${repo}/${file}` so downloads can be cancelled. */
+const activeDownloads = new Map<string, AbortController>()
+
+export function downloadKey(repo: string, file: string): string {
+  return `${repo}/${file}`
+}
+
+/** Cancel an in-flight download. Returns true if a download was found & aborted. */
+export async function cancelDownload(repo: string, file: string): Promise<boolean> {
+  const k = downloadKey(repo, file)
+  const ctrl = activeDownloads.get(k)
+  if (!ctrl) return false
+  ctrl.abort()
+  activeDownloads.delete(k)
+  // remove the partial file so it doesn't linger as corrupt.
+  try {
+    await fsp.rm(join(paths.models(), `${file}.part`), { force: true })
+  } catch {
+    /* ignore */
+  }
+  return true
+}
+
 function isGguf(name: string): boolean {
   return extname(name).toLowerCase() === '.gguf'
 }
@@ -167,7 +198,7 @@ function detectMultimodal(file: string, repo: string): boolean {
   )
 }
 
-/** Download a single file from a HF repo with progress. */
+/** Download a single file from a HF repo with progress + cancellation. */
 export async function downloadHfFile(
   repo: string,
   file: string,
@@ -180,8 +211,22 @@ export async function downloadHfFile(
   const dest = join(paths.models(), file)
   const tmp = `${dest}.part`
 
-  const res = await fetch(url, { redirect: 'follow' })
+  const k = downloadKey(repo, file)
+  const controller = new AbortController()
+  activeDownloads.set(k, controller)
+
+  let res: Response
+  try {
+    res = await fetch(url, { redirect: 'follow', signal: controller.signal })
+  } catch (err) {
+    activeDownloads.delete(k)
+    if (controller.signal.aborted) {
+      throw new DownloadCancelledError()
+    }
+    throw err
+  }
   if (!res.ok || !res.body) {
+    activeDownloads.delete(k)
     throw new Error(`Download gagal (${res.status}) untuk ${repo}/${file}`)
   }
   const total = Number(res.headers.get('content-length') || 0)
@@ -193,43 +238,63 @@ export async function downloadHfFile(
   // can truncate the file, producing corrupt downloads).
   const reader = (res.body as unknown as ReadableStream<Uint8Array>).getReader()
   const out = createWriteStream(tmp)
-  while (true) {
-    const { done, value } = await reader.read()
-    if (done) break
-    if (value) {
-      await new Promise<void>((resolve, reject) => {
-        out.write(Buffer.from(value), (err) => (err ? reject(err) : resolve()))
-      })
-      loaded += value.byteLength
-      const now = Date.now()
-      if (now - lastEmit > 100) {
-        lastEmit = now
-        const elapsed = (now - start) / 1000
-        onProgress({
-          repo,
-          file,
-          percent: total > 0 ? (loaded / total) * 100 : 0,
-          bytesLoaded: loaded,
-          bytesTotal: total,
-          bytesPerSec: elapsed > 0 ? loaded / elapsed : 0,
-          state: 'downloading'
+  try {
+    while (true) {
+      // Check cancellation between reads so the loop exits promptly on cancel.
+      if (controller.signal.aborted) {
+        throw new DownloadCancelledError()
+      }
+      const { done, value } = await reader.read()
+      if (done) break
+      if (value) {
+        await new Promise<void>((resolve, reject) => {
+          out.write(Buffer.from(value), (err) => (err ? reject(err) : resolve()))
         })
+        loaded += value.byteLength
+        const now = Date.now()
+        if (now - lastEmit > 100) {
+          lastEmit = now
+          const elapsed = (now - start) / 1000
+          onProgress({
+            repo,
+            file,
+            percent: total > 0 ? (loaded / total) * 100 : 0,
+            bytesLoaded: loaded,
+            bytesTotal: total,
+            bytesPerSec: elapsed > 0 ? loaded / elapsed : 0,
+            state: 'downloading'
+          })
+        }
       }
     }
+    await new Promise<void>((resolve, reject) => {
+      out.end(() => resolve())
+      out.on('error', reject)
+    })
+  } catch (err) {
+    // Ensure the stream & file handle are closed on any failure.
+    out.destroy()
+    try {
+      await reader.cancel('cleanup')
+    } catch {
+      /* ignore */
+    }
+    // On cancellation (or any error) remove the partial file.
+    await fsp.rm(tmp, { force: true }).catch(() => {})
+    activeDownloads.delete(k)
+    throw err
   }
-  await new Promise<void>((resolve, reject) => {
-    out.end(() => resolve())
-    out.on('error', reject)
-  })
 
   // Size integrity check — guard against truncated downloads.
   if (total > 0 && loaded !== total) {
+    activeDownloads.delete(k)
     throw new Error(
       `Download ${repo}/${file} tidak lengkap: ${loaded}/${total} byte. Coba lagi.`
     )
   }
 
   await fsp.rename(tmp, dest)
+  activeDownloads.delete(k)
 
   onProgress({
     repo,

@@ -1,6 +1,6 @@
 {
   "name": "SiberLlm",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "SiberLLM — desktop layer UI for running llama.cpp as an OpenAI-compatible API server.",
   "author": "datasiberLab <candrapwr@datasiber.com>",
   "license": "MIT",

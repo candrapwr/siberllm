@@ -48,7 +48,7 @@ export interface ScanResult {
   mmproj: LocalModel[]
 }
 
-export type ModelDownloadState = 'idle' | 'downloading' | 'done' | 'error'
+export type ModelDownloadState = 'idle' | 'downloading' | 'done' | 'error' | 'cancelled'
 
 export interface ModelDownloadProgress {
   repo: string

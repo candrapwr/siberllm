@@ -47,12 +47,14 @@ const api = {
       ipcRenderer.invoke(IPC.MODELS_LIST_REPO, repo),
     download: (repo: string, file: string): Promise<ScanResult> =>
       ipcRenderer.invoke(IPC.MODELS_DOWNLOAD_START, repo, file),
+    cancelDownload: (repo: string, file: string): Promise<boolean> =>
+      ipcRenderer.invoke(IPC.MODELS_CANCEL_DOWNLOAD, repo, file),
     onDownloadProgress: (cb: (p: ModelDownloadProgress) => void): (() => void) =>
       subscribe(IPC.MODELS_DOWNLOAD_PROGRESS, cb),
     onDownloadDone: (cb: (p: { repo: string; file: string }) => void): (() => void) =>
       subscribe(IPC.MODELS_DOWNLOAD_DONE, cb),
     onDownloadError: (
-      cb: (p: { repo: string; file: string; message: string }) => void
+      cb: (p: { repo: string; file: string; message: string; cancelled?: boolean }) => void
     ): (() => void) => subscribe(IPC.MODELS_DOWNLOAD_ERROR, cb)
   },
 

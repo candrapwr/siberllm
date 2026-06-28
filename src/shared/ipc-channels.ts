@@ -14,6 +14,7 @@ export const IPC = {
   MODELS_DOWNLOAD_PROGRESS: 'models:download:progress',
   MODELS_DOWNLOAD_DONE: 'models:download:done',
   MODELS_DOWNLOAD_ERROR: 'models:download:error',
+  MODELS_CANCEL_DOWNLOAD: 'models:download:cancel',
   MODELS_DELETE: 'models:delete',
   MODELS_ADD_FOLDER: 'models:addFolder',
   MODELS_IMPORT_FILES: 'models:importFiles',

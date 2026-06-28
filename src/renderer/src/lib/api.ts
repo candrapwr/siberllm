@@ -33,6 +33,7 @@ const stub: SiberLLMApi = {
     searchHf: noop,
     listRepoFiles: noop,
     download: noop,
+    cancelDownload: noop,
     onDownloadProgress: noopSub as never,
     onDownloadDone: noopSub as never,
     onDownloadError: noopSub as never

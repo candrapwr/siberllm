@@ -254,7 +254,7 @@ function EmptyHint({ text }: { text: string }) {
 
 function DownloadModels() {
   const { t } = useTranslation()
-  const { catalog, loadCatalog, search, searchResults, searching, downloading, download, error } =
+  const { catalog, loadCatalog, search, searchResults, searching, downloading, download, cancel, error } =
     useModelsStore()
   const [query, setQuery] = useState('')
   // expanded repo -> list of gguf files (loaded on demand when clicking "Lihat file")
@@ -311,6 +311,7 @@ function DownloadModels() {
               model={m}
               progress={downloading[`${m.repo}/${m.file}`]}
               onDownload={() => download(m.repo, m.file)}
+              onCancel={() => cancel(m.repo, m.file)}
             />
           ))}
         </div>
@@ -402,6 +403,7 @@ function DownloadModels() {
                               file={f}
                               progress={progress}
                               onDownload={() => download(r.id, f.name)}
+                              onCancel={() => cancel(r.id, f.name)}
                             />
                           )
                         })
@@ -425,18 +427,21 @@ function RepoFileCard({
   repo,
   file,
   progress,
-  onDownload
+  onDownload,
+  onCancel
 }: {
   repo: string
   file: import('@shared/types').RepoFile
   progress?: import('@shared/types').ModelDownloadProgress
   onDownload: () => void
+  onCancel: () => void
 }) {
   const { t } = useTranslation()
   const state = progress?.state ?? 'idle'
   const isDownloading = state === 'downloading'
   const isDone = state === 'done'
   const isError = state === 'error'
+  const isCancelled = state === 'cancelled'
   const label = file.name
     .replace(/\.gguf$/i, '')
     .replace(/[-_]/g, ' ')
@@ -492,19 +497,28 @@ function RepoFileCard({
             <span>{t('models.download')} — 100%</span>
           </div>
         )}
+        {isCancelled && (
+          <div className="flex items-center gap-2 text-xs text-amber-400">
+            <span>⊘</span>
+            <span>{t('models.cancelled')}</span>
+          </div>
+        )}
         {isError && (
-          <div className="text-xs text-destructive">{t('models.download')} — error</div>
+          <div className="flex items-center gap-2 text-xs text-destructive">
+            <span>✗</span>
+            <span>{t('models.downloadFailed')}</span>
+          </div>
         )}
 
-        <Button size="sm" onClick={onDownload} disabled={isDownloading}>
-          {isDownloading ? (
-            <Spinner size={14} label={t('models.downloading2')} />
-          ) : isDone ? (
-            '✓'
-          ) : (
-            t('models.download')
-          )}
-        </Button>
+        {isDownloading ? (
+          <Button size="sm" variant="outline" className="text-destructive" onClick={onCancel}>
+            {t('models.cancel')}
+          </Button>
+        ) : (
+          <Button size="sm" onClick={onDownload} disabled={isDone}>
+            {isDone ? '✓' : t('models.download')}
+          </Button>
+        )}
       </CardContent>
     </Card>
   )
@@ -513,17 +527,20 @@ function RepoFileCard({
 function CatalogCard({
   model,
   progress,
-  onDownload
+  onDownload,
+  onCancel
 }: {
   model: CatalogModel
   progress?: import('@shared/types').ModelDownloadProgress
   onDownload: () => void
+  onCancel: () => void
 }) {
   const { t } = useTranslation()
   const state = progress?.state ?? 'idle'
   const isDownloading = state === 'downloading'
   const isDone = state === 'done'
   const isError = state === 'error'
+  const isCancelled = state === 'cancelled'
   return (
     <Card>
       <CardHeader className="pb-2">
@@ -570,19 +587,28 @@ function CatalogCard({
             <span>{t('models.download')} — 100%</span>
           </div>
         )}
+        {isCancelled && (
+          <div className="flex items-center gap-2 text-xs text-amber-400">
+            <span>⊘</span>
+            <span>{t('models.cancelled')}</span>
+          </div>
+        )}
         {isError && (
-          <div className="text-xs text-destructive">{t('models.download')} — error</div>
+          <div className="flex items-center gap-2 text-xs text-destructive">
+            <span>✗</span>
+            <span>{t('models.downloadFailed')}</span>
+          </div>
         )}
 
-        <Button size="sm" onClick={onDownload} disabled={isDownloading}>
-          {isDownloading ? (
-            <Spinner size={14} label={t('models.catalogDownloading')} />
-          ) : isDone ? (
-            '✓'
-          ) : (
-            t('models.download')
-          )}
-        </Button>
+        {isDownloading ? (
+          <Button size="sm" variant="outline" className="text-destructive" onClick={onCancel}>
+            {t('models.cancel')}
+          </Button>
+        ) : (
+          <Button size="sm" onClick={onDownload} disabled={isDone}>
+            {isDone ? '✓' : t('models.download')}
+          </Button>
+        )}
       </CardContent>
     </Card>
   )
