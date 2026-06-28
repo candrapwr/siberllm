@@ -59,15 +59,63 @@ export const useModelsStore = create<ModelsStore>((set, get) => ({
 
   download: async (repo, file) => {
     set({ error: null })
+    // mark as downloading immediately so the UI shows a spinner before the
+    // first progress event arrives.
+    set((s) => ({
+      downloading: {
+        ...s.downloading,
+        [key(repo, file)]: {
+          repo,
+          file,
+          percent: 0,
+          bytesLoaded: 0,
+          bytesTotal: 0,
+          bytesPerSec: 0,
+          state: 'downloading'
+        }
+      }
+    }))
     try {
       const scan = await api.models.download(repo, file)
-      const next = { ...get().downloading }
-      delete next[key(repo, file)]
-      set({ scan, downloading: next })
+      // keep the "done" state visible briefly so the user sees 100%, then clear.
+      set((s) => ({
+        scan,
+        downloading: {
+          ...s.downloading,
+          [key(repo, file)]: {
+            repo,
+            file,
+            percent: 100,
+            bytesLoaded: 0,
+            bytesTotal: 0,
+            bytesPerSec: 0,
+            state: 'done'
+          }
+        }
+      }))
+      setTimeout(() => {
+        set((s) => {
+          const next = { ...s.downloading }
+          delete next[key(repo, file)]
+          return { downloading: next }
+        })
+      }, 2500)
     } catch (err) {
-      set({
+      set((s) => ({
+        downloading: {
+          ...s.downloading,
+          [key(repo, file)]: {
+            repo,
+            file,
+            percent: 0,
+            bytesLoaded: 0,
+            bytesTotal: 0,
+            bytesPerSec: 0,
+            state: 'error'
+          }
+        },
         error: err instanceof Error ? err.message : String(err)
-      })
+      }))
     }
   },
 

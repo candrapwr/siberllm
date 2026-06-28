@@ -43,7 +43,7 @@ const api = {
       ipcRenderer.invoke(IPC.MODELS_IMPORT_FILES),
     searchHf: (query: string, limit?: number) =>
       ipcRenderer.invoke(IPC.MODELS_SEARCH_HF, query, limit),
-    listRepoFiles: (repo: string): Promise<string[]> =>
+    listRepoFiles: (repo: string): Promise<import('@shared/types').RepoFile[]> =>
       ipcRenderer.invoke(IPC.MODELS_LIST_REPO, repo),
     download: (repo: string, file: string): Promise<ScanResult> =>
       ipcRenderer.invoke(IPC.MODELS_DOWNLOAD_START, repo, file),
@@ -87,7 +87,8 @@ const api = {
 
   // ---------- env (read-only facts the renderer may need) ----------
   env: {
-    platform: process.platform
+    platform: process.platform,
+    appVersion: ipcRenderer.sendSync('app:version') as string
   }
 }
 

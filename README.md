@@ -32,6 +32,27 @@ API server for you.
   to chat with your model in the browser.
 - **Everything stays private** — inference runs on your hardware. Nothing is sent
   to a remote server.
+- **Bilingual UI** — Indonesian (default) and English, switchable in one click.
+
+---
+
+## 📸 Screenshots
+
+### Model management
+
+Browse the curated catalog, search HuggingFace, or import your own `.gguf` files.
+Each file shows its type (text / multimodal / mmproj), size, and download
+progress.
+
+![Model management](./list_model_screen.png)
+
+### Run server
+
+Pick a model, set parameters (GPU layers, context size, host/port), and start the
+server. When ready, open the web UI or the OpenAI-compatible endpoint with one
+click.
+
+![Run server](./run_screen.png)
 
 ---
 
@@ -48,7 +69,8 @@ API server for you.
 ## 🚀 Getting started
 
 1. **Download** the latest SiberLLM release for your platform
-   (`.dmg` for macOS, `.exe` for Windows, `.AppImage`/`.deb` for Linux).
+   (`.dmg` for macOS, `.exe` for Windows, `.AppImage`/`.deb` for Linux) from the
+   [Releases page](https://github.com/candrapwr/siberllm/releases).
 2. **Install & launch** SiberLLM.
 3. On first launch, go to **Setup** and click **"Install llama.cpp"**.
    SiberLLM detects your hardware and downloads the best build automatically.
@@ -59,6 +81,10 @@ API server for you.
    `http://127.0.0.1:port/v1/chat/completions` URL into any OpenAI-compatible app.
 
 That's it — you now have a local, private AI server.
+
+> **macOS note:** if you see *"SiberLLM.app is damaged"*, it's the Gatekeeper
+> quarantine flag on unsigned builds. Run:
+> `xattr -cr /Applications/SiberLLM.app` then open it again.
 
 ---
 
@@ -111,8 +137,13 @@ downloads from `github.com` (engine) and `huggingface.co` (models), and the loca
 server only listens on `127.0.0.1` (your own computer).
 
 **Where are my models stored?**
-In the app's data folder, under `siberllm/models/`. See Settings to add extra
-folders you already keep models in.
+In the app's data folder, under `siberllm/models/`. Use **Settings → Storage
+Location** to open it in your file manager, or add extra folders you already keep
+models in.
+
+**Can I change the language?**
+Yes — click the 🇮🇩/🇬🇧 toggle at the top of the sidebar. Your choice is
+remembered across launches.
 
 ---
 
@@ -120,6 +151,8 @@ folders you already keep models in.
 
 MIT — SiberLLM is free and open source. It is built on top of the amazing
 [llama.cpp](https://github.com/ggml-org/llama.cpp) project.
+
+Made with care by **datasiberLab** — [candrapwr@datasiber.com](mailto:candrapwr@datasiber.com).
 
 ---
 

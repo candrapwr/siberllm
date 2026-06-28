@@ -1,6 +1,6 @@
 // SiberLLM — Electron main process entry.
 
-import { app, BrowserWindow, shell, session } from 'electron'
+import { app, BrowserWindow, shell, session, ipcMain } from 'electron'
 import { join } from 'node:path'
 import { paths } from './services/paths'
 import { registerInstallIpc } from './ipc/install.ipc'
@@ -103,6 +103,10 @@ async function createWindow(): Promise<BrowserWindow> {
 }
 
 function registerIpc(): void {
+  // Synchronous version read for the renderer (used by preload at load time).
+  ipcMain.on('app:version', (event: Electron.IpcMainEvent) => {
+    event.returnValue = app.getVersion()
+  })
   registerSettingsIpc()
   registerShellIpc()
   registerInstallIpc(getMainWindow)

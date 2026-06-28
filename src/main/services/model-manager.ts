@@ -10,7 +10,7 @@ import {
 } from '@shared/constants'
 import { paths } from './paths'
 import { getSettings, setSettings } from '../store'
-import type { LocalModel, ScanResult, ModelDownloadProgress } from '@shared/types'
+import type { LocalModel, ScanResult, ModelDownloadProgress, RepoFile } from '@shared/types'
 
 const MMPROJ_HINT = /mmproj/i
 
@@ -122,8 +122,7 @@ export async function searchHuggingFace(query: string, limit = 20): Promise<
   }))
 }
 
-/** Resolve downloadable gguf files for a repo. */
-export async function listRepoFiles(repo: string): Promise<string[]> {
+export async function listRepoFiles(repo: string): Promise<RepoFile[]> {
   const url = `${HUGGINGFACE_API}/models/${repo}`
   assertApiHost(url)
   const res = await fetch(url, {
@@ -131,9 +130,41 @@ export async function listRepoFiles(repo: string): Promise<string[]> {
   })
   if (!res.ok) throw new Error(`Gagal mengambil file repo ${repo}: ${res.status}`)
   const json = (await res.json()) as { siblings?: Array<{ rfilename: string }> }
-  return (json.siblings ?? [])
+  const ggufFiles = (json.siblings ?? [])
     .map((s) => s.rfilename)
     .filter((f) => isGguf(f))
+
+  // Fetch each file's size via HEAD in parallel (bounded concurrency).
+  const concurrency = 6
+  const out: RepoFile[] = []
+  for (let i = 0; i < ggufFiles.length; i += concurrency) {
+    const batch = ggufFiles.slice(i, i + concurrency)
+    const metas = await Promise.all(
+      batch.map(async (name) => {
+        const fileUrl = `${HUGGINGFACE_RESOLVE}/${repo}/resolve/main/${name}`
+        try {
+          const h = await fetch(fileUrl, { method: 'HEAD', redirect: 'follow' })
+          const size = Number(h.headers.get('content-length') || 0)
+          return { name, sizeBytes: size, isMmproj: MMPROJ_HINT.test(name), multimodal: detectMultimodal(name, repo) }
+        } catch {
+          return { name, sizeBytes: 0, isMmproj: MMPROJ_HINT.test(name), multimodal: detectMultimodal(name, repo) }
+        }
+      })
+    )
+    out.push(...metas)
+  }
+  // model files first, mmproj last
+  return out.sort((a, b) => Number(a.isMmproj) - Number(b.isMmproj))
+}
+
+/** Heuristic: does this file/repo look like a multimodal (vision) model? */
+function detectMultimodal(file: string, repo: string): boolean {
+  const s = `${repo}/${file}`.toLowerCase()
+  return (
+    /vision|vl|llava|moondream|minicpm-v|qwen2.?vl|gemma3|pixtral|phi-3.?vision|vila|cogvlm|internvl|chameleon/.test(
+      s
+    )
+  )
 }
 
 /** Download a single file from a HF repo with progress. */
