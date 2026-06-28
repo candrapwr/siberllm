@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useModelsStore } from '../store/models'
 import { useInstallStore } from '../store/install'
+import { useProfilesStore } from '../store/profiles'
 import { api } from '../lib/api'
 import { Button } from '../components/ui/Button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/Card'
@@ -18,18 +19,21 @@ export default function Models() {
   const { t } = useTranslation()
   const installed = useInstallStore((s) => s.status?.installed)
   const { scan, refresh, remove } = useModelsStore()
+  const scanning = useModelsStore((s) => s.scanning)
+  const selectedId = useProfilesStore((s) => s.selectedId)
   const [tab, setTab] = useState<Tab>('local')
   const [importing, setImporting] = useState(false)
   const [addingFolder, setAddingFolder] = useState(false)
 
+  // Re-scan whenever the active profile changes (different machine = different models).
   useEffect(() => {
     void refresh()
-  }, [refresh])
+  }, [refresh, selectedId])
 
   const handleImportFiles = async (): Promise<void> => {
     setImporting(true)
     try {
-      const res = await api.models.importFiles()
+      const res = await api.models.importFiles(selectedId)
       if (res.imported > 0) await refresh()
     } finally {
       setImporting(false)
@@ -43,7 +47,7 @@ export default function Models() {
       // the scanner includes it. Picking alone does nothing — it must be added.
       const folder = await api.models.pickFolder()
       if (folder) {
-        await api.models.addFolder(folder)
+        await api.models.addFolder(selectedId, folder)
         await refresh()
       }
     } finally {
@@ -78,7 +82,12 @@ export default function Models() {
       </header>
 
       <div className="flex-1 overflow-y-auto p-6">
-        {tab === 'local' ? (
+        {scanning ? (
+          <div className="flex h-48 flex-col items-center justify-center gap-3 text-muted-foreground">
+            <Spinner />
+            <p className="text-sm">{t('models.scanning')}</p>
+          </div>
+        ) : tab === 'local' ? (
           <LocalModels
             models={scan?.models ?? []}
             mmproj={scan?.mmproj ?? []}

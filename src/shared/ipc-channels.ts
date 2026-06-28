@@ -27,6 +27,7 @@ export const IPC = {
   SERVER_START: 'server:start',
   SERVER_STOP: 'server:stop',
   SERVER_STATUS: 'server:status',
+  SERVER_PROBE: 'server:probe',
   SERVER_LOG: 'server:log',
   SERVER_READY: 'server:ready',
   SERVER_ERROR: 'server:error',
@@ -34,6 +35,14 @@ export const IPC = {
   // ---- settings ----
   SETTINGS_GET: 'settings:get',
   SETTINGS_SET: 'settings:set',
+
+  // ---- profiles (target machines: local or SSH remote) ----
+  PROFILES_LIST: 'profiles:list',
+  PROFILES_CREATE: 'profiles:create',
+  PROFILES_UPDATE: 'profiles:update',
+  PROFILES_DELETE: 'profiles:delete',
+  PROFILES_SELECT: 'profiles:select',
+  PROFILES_TEST: 'profiles:test',
 
   // ---- shell ----
   OPEN_EXTERNAL: 'shell:openExternal',

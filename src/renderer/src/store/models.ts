@@ -4,6 +4,7 @@ import { create } from 'zustand'
 import type { ModelDownloadProgress, ScanResult } from '@shared/types'
 import type { CatalogModel } from '@shared/constants'
 import { api } from '../lib/api'
+import { useProfilesStore } from './profiles'
 
 interface DownloadingMap {
   [key: string]: ModelDownloadProgress // key = `${repo}/${file}`
@@ -12,6 +13,8 @@ interface DownloadingMap {
 interface ModelsStore {
   scan: ScanResult | null
   catalog: CatalogModel[]
+  /** True while scanning the target (SSH scans take a moment). */
+  scanning: boolean
   searching: boolean
   searchResults: Array<{ id: string; downloads: number; likes: number }>
   downloading: DownloadingMap
@@ -22,21 +25,37 @@ interface ModelsStore {
   download: (repo: string, file: string) => Promise<void>
   cancel: (repo: string, file: string) => Promise<void>
   remove: (path: string) => Promise<void>
+  /** Clear all per-target state (called when the active profile changes). */
+  reset: () => void
 }
 
 const key = (repo: string, file: string) => `${repo}/${file}`
 
+/** The active profile id (falls back to 'local' if none selected). */
+function activeProfileId(): string {
+  return useProfilesStore.getState().selectedId || 'local'
+}
+
 export const useModelsStore = create<ModelsStore>((set, get) => ({
   scan: null,
   catalog: [],
+  scanning: false,
   searching: false,
   searchResults: [],
   downloading: {},
   error: null,
 
   refresh: async () => {
-    const scan = await api.models.scan()
-    set({ scan })
+    set({ scanning: true, error: null })
+    try {
+      const scan = await api.models.scan(activeProfileId())
+      set({ scan, scanning: false })
+    } catch (err) {
+      set({
+        scanning: false,
+        error: err instanceof Error ? err.message : String(err)
+      })
+    }
   },
 
   loadCatalog: async () => {
@@ -106,7 +125,7 @@ export const useModelsStore = create<ModelsStore>((set, get) => ({
       }
     }))
     try {
-      const scan = await api.models.download(repo, file)
+      const scan = await api.models.download(activeProfileId(), repo, file)
       // Only mark "done" if the download wasn't cancelled mid-flight.
       // The cancel action sets state='cancelled'; if we overwrite that with
       // 'done' here, the UI would falsely show "100% success".
@@ -158,9 +177,14 @@ export const useModelsStore = create<ModelsStore>((set, get) => ({
   },
 
   remove: async (path) => {
-    const scan = await api.models.delete(path)
+    const scan = await api.models.delete(activeProfileId(), path)
     set({ scan })
-  }
+  },
+
+  reset: () =>
+    // Wipe the model list from the previous profile so the new profile's models
+    // are scanned fresh. Catalog is shared, so keep it.
+    set({ scan: null, scanning: false, error: null, downloading: {} })
 }))
 
 api.models.onDownloadProgress((p) =>

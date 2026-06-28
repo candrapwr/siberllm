@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { useInstallStore } from '../store/install'
+import { useProfilesStore } from '../store/profiles'
 import { Button } from '../components/ui/Button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/Card'
 import { Progress } from '../components/ui/Progress'
@@ -16,11 +17,13 @@ export default function Setup() {
   const { t } = useTranslation()
   const navigate = useNavigate()
   const { status, loading, progress, error, refresh, start } = useInstallStore()
+  const selectedId = useProfilesStore((s) => s.selectedId)
   const [backend, setBackend] = useState<'auto' | GpuBackend>('auto')
 
+  // Re-check install status whenever the active profile changes.
   useEffect(() => {
     void refresh()
-  }, [refresh])
+  }, [refresh, selectedId])
 
   // redirect to models once installed.
   useEffect(() => {

@@ -7,35 +7,41 @@ import { installLlamaCpp } from '../services/llama-download'
 import { detectPlatform } from '../services/backend-detect'
 import { normalizePlatform, type GpuBackend } from '@shared/platforms'
 import { setSettings } from '../store'
+import { resolveHost } from './host-resolver'
 
 export function registerInstallIpc(getMainWindow: () => BrowserWindow | null): void {
-  // Status check (used by Setup page on load).
-  ipcMain.handle(IPC.INSTALL_CHECK, async () => {
-    return checkInstall()
+  // Status check (used by Setup page on load). First arg is the profile id.
+  ipcMain.handle(IPC.INSTALL_CHECK, async (_evt, profileId?: string) => {
+    const { target, paths } = await resolveHost(profileId)
+    return checkInstall(target, paths)
   })
 
-  // Begin install. Optionally accepts an explicit backend override.
+  // Begin install. Accepts an explicit backend override and a profile id.
   ipcMain.handle(
     IPC.INSTALL_START,
-    async (_evt, backendOverride?: GpuBackend | 'auto') => {
+    async (_evt, backendOverride?: GpuBackend | 'auto', profileId?: string) => {
       const win = getMainWindow()
+      const { target, paths } = await resolveHost(profileId)
 
-      // Resolve the platform to install for.
+      // Resolve the platform to install for (detected ON the target).
       let platform
       if (backendOverride && backendOverride !== 'auto') {
+        const tp = await target.platform()
         platform = normalizePlatform(
-          process.platform,
-          process.arch,
+          tp.os === 'darwin' ? 'darwin' : tp.os === 'win32' ? 'win32' : 'linux',
+          tp.arch as 'arm64' | 'x64',
           backendOverride as GpuBackend
         )
         await setSettings({ backend: backendOverride, platform })
       } else {
-        platform = await detectPlatform()
+        platform = await detectPlatform(target)
         await setSettings({ backend: 'auto', platform })
       }
 
       try {
         await installLlamaCpp({
+          target,
+          paths,
           platform,
           onProgress: (p) => {
             win?.webContents.send(IPC.INSTALL_PROGRESS, p)

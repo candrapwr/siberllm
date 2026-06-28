@@ -1,9 +1,12 @@
-// Download & install the llama-server prebuilt binary from ggml-org/llama.cpp releases.
-// Emits progress through a callback so the IPC layer can forward to the renderer.
+// Download & install the llama-server prebuilt binary from ggml-org/llama.cpp
+// releases. Emits progress through a callback so the IPC layer can forward to
+// the renderer.
+//
+// For the local target, behaviour is identical to before. For SSH targets the
+// downloaded archive is written to the remote machine (via HostTarget's
+// createWriteStream) and extracted there with the target's own tar/unzip.
 
-import { createWriteStream, promises as fsp } from 'node:fs'
 import { join } from 'node:path'
-import { spawn } from 'node:child_process'
 import {
   GITHUB_API,
   LLAMA_CPP_REPO,
@@ -17,7 +20,11 @@ import {
   type PlatformInfo,
   type ArchiveType
 } from '@shared/platforms'
-import { paths } from './paths'
+import { paths as localPaths } from './paths'
+import type { HostTarget } from './host/types'
+import { type AsyncPathResolver } from './host/paths-resolver'
+import { localTarget } from './host/local-target'
+import { remoteFetchToFile } from './host/remote-fetch'
 import type { InstallProgress } from '@shared/types'
 import { setSettings } from '../store'
 
@@ -48,6 +55,7 @@ async function fetchLatestRelease(): Promise<GitHubRelease> {
 
 /** Download a single asset with byte-level progress + size verification. */
 async function downloadAsset(
+  target: HostTarget,
   asset: GitHubAsset,
   destFile: string,
   onProgress: (loaded: number, total: number) => void
@@ -57,6 +65,21 @@ async function downloadAsset(
   // here; redirect:'follow' lets fetch move to the CDN (also whitelisted).
   assertDownloadHost(asset.browser_download_url)
 
+  // ---- SSH target: let the remote machine fetch directly (single hop). ----
+  if (target.kind === 'ssh') {
+    const assetTotal = asset.size || 0
+    await remoteFetchToFile(
+      target,
+      asset.browser_download_url,
+      destFile,
+      ({ bytesLoaded, bytesTotal }) => {
+        onProgress(bytesLoaded, bytesTotal || assetTotal)
+      }
+    )
+    return
+  }
+
+  // ---- Local target: fetch in-process and stream to disk ----
   const res = await fetch(asset.browser_download_url, { redirect: 'follow' })
   if (!res.ok || !res.body) {
     throw new Error(`Download failed for ${asset.name}: ${res.status}`)
@@ -68,32 +91,39 @@ async function downloadAsset(
   // Read the web stream manually with a Reader — avoids the stream race that
   // happens when a 'data' listener and pipeline() both consume the same stream.
   const reader = (res.body as unknown as ReadableStream<Uint8Array>).getReader()
-  const out = createWriteStream(destFile)
+  const out = await target.createWriteStream(destFile)
   let loaded = 0
   let lastEmit = 0
 
-  while (true) {
-    const { done, value } = await reader.read()
-    if (done) break
-    if (value) {
-      // writeAsync via a promise wrapper to get backpressure + error surfacing
-      await new Promise<void>((resolve, reject) => {
-        out.write(Buffer.from(value), (err) => (err ? reject(err) : resolve()))
-      })
-      loaded += value.byteLength
-      const now = Date.now()
-      if (now - lastEmit > 100 || loaded === total) {
-        lastEmit = now
-        onProgress(loaded, total)
+  try {
+    while (true) {
+      const { done, value } = await reader.read()
+      if (done) break
+      if (value) {
+        await out.write(Buffer.from(value))
+        loaded += value.byteLength
+        const now = Date.now()
+        if (now - lastEmit > 100 || loaded === total) {
+          lastEmit = now
+          onProgress(loaded, total)
+        }
       }
     }
+    await out.close()
+  } catch (err) {
+    try {
+      await out.close()
+    } catch {
+      /* ignore */
+    }
+    try {
+      await reader.cancel('cleanup')
+    } catch {
+      /* ignore */
+    }
+    await target.rm(destFile, { force: true }).catch(() => {})
+    throw err
   }
-
-  // flush & close
-  await new Promise<void>((resolve, reject) => {
-    out.end(() => resolve())
-    out.on('error', reject)
-  })
 
   // Size integrity check — guard against truncated downloads.
   if (total > 0 && loaded !== total) {
@@ -105,79 +135,69 @@ async function downloadAsset(
   onProgress(loaded, total)
 }
 
-/** Extract an archive (.zip or .tar.gz) into a destination dir.
- *  Captures stderr so failures include the underlying tool's message. */
+/** Extract an archive (.zip or .tar.gz) into a destination dir ON THE TARGET.
+ *  Uses the target's tar/unzip (Linux/macOS) or PowerShell (Windows local). */
 async function extractArchive(
+  target: HostTarget,
   archivePath: string,
   destDir: string,
   archiveType: ArchiveType
 ): Promise<void> {
-  await fsp.mkdir(destDir, { recursive: true })
-
-  const run = (cmd: string, args: string[]): Promise<void> =>
-    new Promise<void>((resolve, reject) => {
-      const p = spawn(cmd, args, { stdio: ['ignore', 'pipe', 'pipe'] })
-      let stderr = ''
-      p.stderr?.on('data', (chunk: Buffer) => {
-        stderr += chunk.toString()
-      })
-      // also drain stdout so the pipe can't fill up & hang
-      p.stdout?.on('data', () => {})
-      p.on('error', reject)
-      p.on('exit', (code) => {
-        if (code === 0) resolve()
-        else {
-          const detail = stderr.trim()
-          reject(
-            new Error(
-              `${cmd} exited ${code}${detail ? `: ${detail}` : ''}`
-            )
-          )
-        }
-      })
-    })
+  await target.mkdir(destDir, { recursive: true })
 
   if (archiveType === 'tar.gz') {
     // tar is available on macOS/Linux (bsdtar/gnu tar). Windows 10+ bundles it too.
-    await run('tar', ['-xzf', archivePath, '-C', destDir])
+    const r = await target.exec('tar', ['-xzf', archivePath, '-C', destDir])
+    if (r.code !== 0) {
+      throw new Error(`tar exited ${r.code}${r.stderr.trim() ? `: ${r.stderr.trim()}` : ''}`)
+    }
     return
   }
 
-  // .zip
-  if (process.platform !== 'win32') {
-    await run('unzip', ['-o', archivePath, '-d', destDir])
+  // .zip — choose unzip vs PowerShell based on the target platform.
+  const plat = await target.platform()
+  if (plat.os !== 'win32') {
+    const r = await target.exec('unzip', ['-o', archivePath, '-d', destDir])
+    if (r.code !== 0) {
+      throw new Error(`unzip exited ${r.code}${r.stderr.trim() ? `: ${r.stderr.trim()}` : ''}`)
+    }
     return
   }
   // Windows: PowerShell Expand-Archive.
-  await run('powershell', [
+  const r = await target.exec('powershell', [
     '-NoProfile',
     '-Command',
     `Expand-Archive -LiteralPath '${archivePath}' -DestinationPath '${destDir}' -Force`
   ])
+  if (r.code !== 0) {
+    throw new Error(`powershell exited ${r.code}${r.stderr.trim() ? `: ${r.stderr.trim()}` : ''}`)
+  }
 }
 
-async function chmodPlusx(file: string): Promise<void> {
-  if (process.platform === 'win32') return
+async function chmodPlusx(target: HostTarget, file: string): Promise<void> {
+  const plat = await target.platform()
+  if (plat.os === 'win32') return
   try {
-    await fsp.chmod(file, 0o755)
+    await target.chmod(file, 0o755)
   } catch {
     /* ignore */
   }
 }
 
-/** Make all binaries in bin/ executable (unix). */
-async function makeBinExecutable(dir: string): Promise<void> {
-  if (process.platform === 'win32') return
-  let entries: string[] = []
+/** Make all binaries in bin/ executable (unix) on the target. */
+async function makeBinExecutable(target: HostTarget, dir: string): Promise<void> {
+  const plat = await target.platform()
+  if (plat.os === 'win32') return
+  let entries
   try {
-    entries = await fsp.readdir(dir)
+    entries = await target.readdir(dir)
   } catch {
     return
   }
   await Promise.all(
     entries
-      .filter((n) => !n.endsWith('.dylib') && !n.endsWith('.so') && !n.includes('.'))
-      .map((n) => chmodPlusx(join(dir, n)).catch(() => {}))
+      .filter((n) => n.isFile && !n.name.endsWith('.dylib') && !n.name.endsWith('.so') && !n.name.includes('.'))
+      .map((n) => chmodPlusx(target, join(dir, n.name)).catch(() => {}))
   )
 }
 
@@ -187,23 +207,23 @@ async function makeBinExecutable(dir: string): Promise<void> {
  * sub-directory and no loose files, move its contents up one level so
  * `llama-server` lands directly in bin/.
  */
-async function flattenIfSingleSubdir(dir: string): Promise<void> {
-  let entries: import('node:fs').Dirent[]
+async function flattenIfSingleSubdir(target: HostTarget, dir: string): Promise<void> {
+  let entries
   try {
-    entries = await fsp.readdir(dir, { withFileTypes: true })
+    entries = await target.readdir(dir)
   } catch {
     return
   }
-  const files = entries.filter((e) => e.isFile())
-  const dirs = entries.filter((e) => e.isDirectory())
+  const files = entries.filter((e) => e.isFile)
+  const dirs = entries.filter((e) => e.isDir)
 
   // Only flatten when there are no loose files and exactly one sub-folder.
   if (files.length > 0 || dirs.length !== 1) return
 
   const sub = join(dir, dirs[0].name)
-  let subEntries: import('node:fs').Dirent[]
+  let subEntries
   try {
-    subEntries = await fsp.readdir(sub, { withFileTypes: true })
+    subEntries = await target.readdir(sub)
   } catch {
     return
   }
@@ -212,13 +232,15 @@ async function flattenIfSingleSubdir(dir: string): Promise<void> {
   for (const e of subEntries) {
     const from = join(sub, e.name)
     const to = join(dir, e.name)
-    await fsp.rename(from, to).catch(() => {})
+    await target.rename(from, to).catch(() => {})
   }
   // Remove the now-empty wrapper folder.
-  await fsp.rm(sub, { recursive: true, force: true }).catch(() => {})
+  await target.rm(sub, { recursive: true, force: true }).catch(() => {})
 }
 
 export interface InstallOptions {
+  target?: HostTarget
+  paths: AsyncPathResolver
   platform: PlatformInfo
   onProgress?: ProgressCb
 }
@@ -227,7 +249,12 @@ export interface InstallOptions {
  * Orchestrates the full install flow:
  *   detect -> fetch release -> download (main + companion) -> extract -> finalize.
  */
-export async function installLlamaCpp({ platform, onProgress }: InstallOptions): Promise<void> {
+export async function installLlamaCpp({
+  target = localTarget,
+  paths,
+  platform,
+  onProgress
+}: InstallOptions): Promise<void> {
   const emit = (p: InstallProgress) => onProgress?.(p)
 
   emit({ stage: 'fetching-release', percent: 1, message: 'Memeriksa rilis terbaru llama.cpp…' })
@@ -257,7 +284,10 @@ export async function installLlamaCpp({ platform, onProgress }: InstallOptions):
     : undefined
 
   await paths.ensure()
-  const cacheDir = paths.downloadCache()
+  // The cache dir holds the downloaded archives. It MUST be separate from bin/
+  // (the install flow wipes bin/ before extraction); both targets now expose a
+  // dedicated downloadCache().
+  const cacheDir = await paths.downloadCache()
   const mainZip = join(cacheDir, mainAsset.name)
 
   // ---- download main asset (0% -> 70%) ----
@@ -268,7 +298,7 @@ export async function installLlamaCpp({ platform, onProgress }: InstallOptions):
     assetName: mainAsset.name
   })
   const dlStart = Date.now()
-  await downloadAsset(mainAsset, mainZip, (loaded, total) => {
+  await downloadAsset(target, mainAsset, mainZip, (loaded, total) => {
     const ratio = total > 0 ? loaded / total : 0
     const elapsed = (Date.now() - dlStart) / 1000
     const bps = elapsed > 0 ? loaded / elapsed : 0
@@ -294,7 +324,7 @@ export async function installLlamaCpp({ platform, onProgress }: InstallOptions):
       assetName: companionAsset.name
     })
     const cStart = Date.now()
-    await downloadAsset(companionAsset, companionZip, (loaded, total) => {
+    await downloadAsset(target, companionAsset, companionZip, (loaded, total) => {
       const ratio = total > 0 ? loaded / total : 0
       const elapsed = (Date.now() - cStart) / 1000
       const bps = elapsed > 0 ? loaded / elapsed : 0
@@ -312,36 +342,36 @@ export async function installLlamaCpp({ platform, onProgress }: InstallOptions):
 
   // ---- extract (85% -> 97%) ----
   emit({ stage: 'extracting', percent: 85, message: 'Mengekstrak binary…' })
-  const binDir = paths.bin()
+  const binDir = await paths.bin()
   // Clear previous binaries to avoid stale leftovers / overwrite warnings.
   try {
-    await fsp.rm(binDir, { recursive: true, force: true })
+    await target.rm(binDir, { recursive: true, force: true })
   } catch {
     /* ignore */
   }
-  await fsp.mkdir(binDir, { recursive: true })
-  await extractArchive(mainZip, binDir, archiveType)
+  await target.mkdir(binDir, { recursive: true })
+  await extractArchive(target, mainZip, binDir, archiveType)
   if (companionZip) {
-    await extractArchive(companionZip, binDir, 'zip')
+    await extractArchive(target, companionZip, binDir, 'zip')
   }
 
   // The macOS/Linux tarball wraps everything in a single top-level folder
   // (e.g. llama-b9827/). If that's the case, flatten it so binaries sit
   // directly in bin/ where paths.serverBinary() expects them.
-  await flattenIfSingleSubdir(binDir)
+  await flattenIfSingleSubdir(target, binDir)
   emit({ stage: 'extracting', percent: 97, message: 'Ekstraksi selesai.' })
 
   // ---- finalize ----
   emit({ stage: 'finalizing', percent: 98, message: 'Menjadikan executable…' })
-  await makeBinExecutable(binDir)
+  await makeBinExecutable(target, binDir)
 
   // Persist platform so we don't re-detect every launch.
   await setSettings({ platform })
 
   // cleanup zips
   await Promise.all([
-    fsp.rm(mainZip, { force: true }),
-    companionZip ? fsp.rm(companionZip, { force: true }) : Promise.resolve()
+    target.rm(mainZip, { force: true }),
+    companionZip ? target.rm(companionZip, { force: true }) : Promise.resolve()
   ])
 
   emit({
@@ -355,3 +385,6 @@ export async function installLlamaCpp({ platform, onProgress }: InstallOptions):
 export async function getLatestReleaseTag(): Promise<string> {
   return (await fetchLatestRelease()).tag_name
 }
+
+// Re-export the local paths for callers that still need a sync logs path.
+export { localPaths }

@@ -3,6 +3,7 @@
 import { create } from 'zustand'
 import type { InstallProgress, InstallStatus } from '@shared/types'
 import { api } from '../lib/api'
+import { useProfilesStore } from './profiles'
 
 interface InstallStore {
   status: InstallStatus | null
@@ -11,6 +12,13 @@ interface InstallStore {
   error: string | null
   refresh: () => Promise<void>
   start: (backend?: 'auto' | 'metal' | 'cuda' | 'vulkan' | 'rocm' | 'cpu') => Promise<void>
+  /** Clear all per-target state (called when the active profile changes). */
+  reset: () => void
+}
+
+/** The active profile id (falls back to 'local' if none selected). */
+function activeProfileId(): string {
+  return useProfilesStore.getState().selectedId || 'local'
 }
 
 export const useInstallStore = create<InstallStore>((set) => ({
@@ -22,7 +30,7 @@ export const useInstallStore = create<InstallStore>((set) => ({
   refresh: async () => {
     set({ loading: true, error: null })
     try {
-      const status = await api.install.check()
+      const status = await api.install.check(activeProfileId())
       set({ status, loading: false })
     } catch (err) {
       set({
@@ -35,14 +43,19 @@ export const useInstallStore = create<InstallStore>((set) => ({
   start: async (backend) => {
     set({ loading: true, error: null, progress: null })
     try {
-      await api.install.start(backend)
+      await api.install.start(backend, activeProfileId())
     } catch (err) {
       set({
         loading: false,
         error: err instanceof Error ? err.message : String(err)
       })
     }
-  }
+  },
+
+  reset: () =>
+    // Wipe install state from the previous profile so the new profile's status
+    // is fetched fresh.
+    set({ status: null, loading: false, progress: null, error: null })
 }))
 
 // Subscribe once to progress/done/error events at module load.

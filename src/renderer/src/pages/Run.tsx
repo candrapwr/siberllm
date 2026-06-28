@@ -2,6 +2,7 @@ import { useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useServerStore } from '../store/server'
 import { useModelsStore } from '../store/models'
+import { useProfilesStore } from '../store/profiles'
 import { api } from '../lib/api'
 import { Button } from '../components/ui/Button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/Card'
@@ -19,14 +20,22 @@ const STATUS_TONE: Record<ServerStatus, 'default' | 'success' | 'warning' | 'dan
 
 export default function Run() {
   const { t } = useTranslation()
-  const { state, config, setConfig, start, stop, refresh } = useServerStore()
+  const { state, config, setConfig, start, stop, probe, loading, stopping, applyProfile } =
+    useServerStore()
   const scan = useModelsStore((s) => s.scan)
   const refreshModels = useModelsStore((s) => s.refresh)
+  const selectedId = useProfilesStore((s) => s.selectedId)
+  const activeProfile = useProfilesStore((s) =>
+    s.profiles.find((p) => p.id === s.selectedId)
+  )
 
+  // On mount + profile change: re-tune config, then probe the target for an
+  // already-running server (and refresh the model list).
   useEffect(() => {
-    void refresh()
+    if (activeProfile) applyProfile(activeProfile)
+    void probe()
     void refreshModels()
-  }, [refresh, refreshModels])
+  }, [activeProfile, applyProfile, probe, refreshModels, selectedId])
 
   const status = state?.status ?? 'stopped'
   const running = status === 'running'
@@ -56,7 +65,13 @@ export default function Run() {
       </header>
 
       <div className="flex-1 overflow-y-auto p-6">
-        <div className="grid gap-6 lg:grid-cols-2">
+        {loading ? (
+          <div className="flex h-64 flex-col items-center justify-center gap-3 text-muted-foreground">
+            <Spinner />
+            <p className="text-sm">{t('run.loadingTarget')}</p>
+          </div>
+        ) : (
+          <div className="grid gap-6 lg:grid-cols-2">
           {/* ---- config form ---- */}
           <Card>
             <CardHeader>
@@ -158,11 +173,11 @@ export default function Run() {
                   </Button>
                 )}
                 {(running || busy) && (
-                  <Button variant="destructive" onClick={() => stop()} disabled={false}>
-                    {t('run.stop')}
+                  <Button variant="destructive" onClick={() => stop()} disabled={stopping}>
+                    {stopping ? t('run.stopping') : t('run.stop')}
                   </Button>
                 )}
-                <Button variant="outline" onClick={() => refresh()} disabled={busy}>
+                <Button variant="outline" onClick={() => probe()} disabled={busy || loading}>
                   {t('models.refresh')}
                 </Button>
               </div>
@@ -219,6 +234,7 @@ export default function Run() {
             </CardContent>
           </Card>
         </div>
+        )}
       </div>
     </div>
   )

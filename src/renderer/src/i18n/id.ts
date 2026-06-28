@@ -14,6 +14,7 @@ export const id = {
     models: 'Model',
     run: 'Run',
     logs: 'Logs',
+    profiles: 'Profiles',
     settings: 'Settings',
     lockedHint: 'Pasang engine llama.cpp di tab Setup dulu'
   },
@@ -61,6 +62,7 @@ export const id = {
     tabLocal: 'Lokal',
     tabDownload: 'Unduh',
     detected: '{{count}} file .gguf terdeteksi',
+    scanning: 'Memindai mesin target…',
     importFile: '+ Import file',
     addFolder: '+ Tambah folder',
     refresh: 'Refresh',
@@ -100,6 +102,7 @@ export const id = {
   run: {
     title: 'Jalankan Server',
     desc: 'Start llama-server sebagai API OpenAI-compatible.',
+    loadingTarget: 'Menghubungkan mesin target & memeriksa server…',
     config: 'Konfigurasi',
     configDesc: 'Pilih model dan parameter server.',
     selectModel: '— pilih model —',
@@ -120,6 +123,7 @@ export const id = {
     start: 'Start',
     starting: 'Memulai…',
     stop: 'Stop',
+    stopping: 'Menghentikan…',
     startingMsg: 'Memulai server…',
     startingDesc: 'Memuat model ke memori & menunggu server siap. Untuk model besar proses ini bisa beberapa puluh detik. Lihat progres di tab Logs.',
     serverReady: 'Server siap di',
@@ -173,6 +177,38 @@ export const id = {
     label: 'Bahasa',
     id: 'Indonesia',
     en: 'English'
+  },
+
+  // ---- profiles (target machines: Local + SSH remotes) ----
+  profiles: {
+    title: 'Profil',
+    desc: 'Mesin target tempat engine berjalan & model disimpan.',
+    listTitle: 'Profil',
+    listDesc: 'Profil Local selalu ada dan tidak bisa dihapus. Tambah profil SSH untuk menjalankan engine di mesin remote.',
+    localProfile: 'Lokal',
+    active: 'aktif',
+    use: 'Gunakan',
+    edit: 'Edit',
+    delete: 'Hapus',
+    test: 'Tes koneksi',
+    testing: 'Menguji…',
+    addSsh: '+ Tambah profil SSH',
+    editSsh: 'Edit profil SSH',
+    name: 'Nama',
+    host: 'Host',
+    port: 'Port SSH',
+    username: 'Username',
+    password: 'Password',
+    passwordHint: 'Disimpan dengan obfuscasi dasar (bukan enkripsi kuat).',
+    passwordPlaceholder: '••••••••',
+    remoteModelsDir: 'Folder model di remote',
+    remoteBinDir: 'Folder binary engine di remote',
+    securityNote: 'Password disimpan dengan obfuscasi dasar di config. Untuk keamanan penuh, gunakan SSH key (roadmap).',
+    save: 'Simpan',
+    saving: 'Menyimpan…',
+    cancel: 'Batal',
+    switchTitle: 'Ganti mesin target aktif',
+    manage: 'Kelola profil…'
   }
 }
 

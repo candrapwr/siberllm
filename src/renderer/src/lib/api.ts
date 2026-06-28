@@ -42,12 +42,21 @@ const stub: SiberLLMApi = {
     start: noop,
     stop: noop,
     status: noop,
+    probe: noop,
     onLog: noopSub as never,
     onStatus: noopSub as never,
     onReady: noopSub as never,
     onError: noopSub as never
   },
   settings: { get: noop, set: noop },
+  profiles: {
+    list: noop,
+    create: noop,
+    update: noop,
+    remove: noop,
+    select: noop,
+    test: noop
+  },
   openExternal: noop,
   openPath: noop,
   env: { platform: 'linux', appVersion: '0.0.0' }

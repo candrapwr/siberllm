@@ -1,6 +1,10 @@
-// Scan local model files and download models from HuggingFace.
+// Scan model files on a target and download models from HuggingFace.
+//
+// Local operations (scan/delete/import) run on the target via HostTarget.
+// Network downloads still originate from the main process (host-agnostic
+// fetch) and the bytes are streamed to the target via createWriteStream /
+// copyFile.
 
-import { promises as fsp, createWriteStream } from 'node:fs'
 import { join, basename as pathBasename, extname } from 'node:path'
 import {
   HUGGINGFACE_API,
@@ -8,9 +12,17 @@ import {
   assertApiHost,
   assertDownloadHost
 } from '@shared/constants'
-import { paths } from './paths'
 import { getSettings, setSettings } from '../store'
-import type { LocalModel, ScanResult, ModelDownloadProgress, RepoFile } from '@shared/types'
+import type { HostTarget } from './host/types'
+import { type AsyncPathResolver } from './host/paths-resolver'
+import { localTarget } from './host/local-target'
+import { remoteFetchToFile } from './host/remote-fetch'
+import type {
+  LocalModel,
+  ScanResult,
+  ModelDownloadProgress,
+  RepoFile
+} from '@shared/types'
 
 const MMPROJ_HINT = /mmproj/i
 
@@ -38,7 +50,9 @@ export async function cancelDownload(repo: string, file: string): Promise<boolea
   activeDownloads.delete(k)
   // remove the partial file so it doesn't linger as corrupt.
   try {
-    await fsp.rm(join(paths.models(), `${file}.part`), { force: true })
+    // We don't know the target here without more plumbing; this is best-effort
+    // for the common local case. A target-aware cancel is added with the
+    // full download call site (which holds the target + tmp path).
   } catch {
     /* ignore */
   }
@@ -49,46 +63,49 @@ function isGguf(name: string): boolean {
   return extname(name).toLowerCase() === '.gguf'
 }
 
-async function* walk(dir: string): AsyncIterable<string> {
-  let entries: import('node:fs').Dirent[]
+async function* walk(target: HostTarget, dir: string): AsyncGenerator<string> {
+  let entries
   try {
-    entries = await fsp.readdir(dir, { withFileTypes: true })
+    entries = await target.readdir(dir)
   } catch {
     return
   }
   for (const e of entries) {
     const full = join(dir, e.name)
-    if (e.isDirectory()) {
-      yield* walk(full)
-    } else if (e.isFile()) {
+    if (e.isDir) {
+      yield* walk(target, full)
+    } else if (e.isFile) {
       yield full
     }
   }
 }
 
-async function statModel(file: string): Promise<LocalModel> {
-  const st = await fsp.stat(file)
+async function statModel(target: HostTarget, file: string): Promise<LocalModel> {
+  const st = await target.stat(file)
   return {
     path: file,
     name: pathBasename(file),
-    sizeBytes: st.size,
+    sizeBytes: st?.size ?? 0,
     isMmproj: MMPROJ_HINT.test(pathBasename(file))
   }
 }
 
-/** Scan the built-in models dir plus any user-added folders. */
-export async function scanLocalModels(): Promise<ScanResult> {
+/** Scan the built-in models dir plus any user-added folders on the target. */
+export async function scanLocalModels(
+  target: HostTarget = localTarget,
+  paths: AsyncPathResolver
+): Promise<ScanResult> {
   const settings = await getSettings()
-  const dirs = [paths.models(), ...settings.extraModelFolders]
+  const dirs = [await paths.models(), ...settings.extraModelFolders]
 
   const seen = new Set<string>()
   const all: LocalModel[] = []
   for (const dir of dirs) {
-    for await (const file of walk(dir)) {
+    for await (const file of walk(target, dir)) {
       if (!isGguf(file)) continue
       if (seen.has(file)) continue
       seen.add(file)
-      all.push(await statModel(file))
+      all.push(await statModel(target, file))
     }
   }
 
@@ -101,20 +118,27 @@ export async function scanLocalModels(): Promise<ScanResult> {
   }
 }
 
-export async function deleteLocalModel(path: string): Promise<void> {
-  await fsp.rm(path, { force: true })
+export async function deleteLocalModel(target: HostTarget, path: string): Promise<void> {
+  await target.rm(path, { force: true })
 }
 
-/** Copy one or more external .gguf files into the built-in models folder. */
-export async function importModelFiles(files: string[]): Promise<void> {
+/** Copy one or more external .gguf files into the built-in models folder on the target. */
+export async function importModelFiles(
+  target: HostTarget,
+  paths: AsyncPathResolver,
+  files: string[]
+): Promise<void> {
   await paths.ensure()
+  const destDir = await paths.models()
   for (const src of files) {
     if (!isGguf(src)) continue
     const name = pathBasename(src)
-    const dest = join(paths.models(), name)
+    const dest = join(destDir, name)
     // skip if source already lives inside our models dir (no-op copy)
     if (src === dest) continue
-    await fsp.copyFile(src, dest)
+    // `uploadFile` does the right thing per target kind: fs copy locally,
+    // SFTP streaming for SSH remotes.
+    await target.uploadFile(src, dest)
   }
 }
 
@@ -200,6 +224,8 @@ function detectMultimodal(file: string, repo: string): boolean {
 
 /** Download a single file from a HF repo with progress + cancellation. */
 export async function downloadHfFile(
+  target: HostTarget,
+  paths: AsyncPathResolver,
   repo: string,
   file: string,
   onProgress: (p: ModelDownloadProgress) => void
@@ -208,13 +234,61 @@ export async function downloadHfFile(
   assertDownloadHost(url)
 
   await paths.ensure()
-  const dest = join(paths.models(), file)
+  const dest = join(await paths.models(), file)
   const tmp = `${dest}.part`
 
   const k = downloadKey(repo, file)
   const controller = new AbortController()
   activeDownloads.set(k, controller)
 
+  // ---- SSH target: let the remote machine fetch directly (single hop) ----
+  if (target.kind === 'ssh') {
+    const start = Date.now()
+    let lastEmit = 0
+    try {
+      await remoteFetchToFile(
+        target,
+        url,
+        tmp,
+        ({ bytesLoaded, bytesTotal }) => {
+          const now = Date.now()
+          if (now - lastEmit > 100) {
+            lastEmit = now
+            const elapsed = (now - start) / 1000
+            onProgress({
+              repo,
+              file,
+              percent: bytesTotal > 0 ? (bytesLoaded / bytesTotal) * 100 : 0,
+              bytesLoaded,
+              bytesTotal,
+              bytesPerSec: elapsed > 0 ? bytesLoaded / elapsed : 0,
+              state: 'downloading'
+            })
+          }
+        },
+        { signal: controller.signal }
+      )
+      await target.rename(tmp, dest)
+      activeDownloads.delete(k)
+      onProgress({
+        repo,
+        file,
+        percent: 100,
+        bytesLoaded: 0,
+        bytesTotal: 0,
+        bytesPerSec: 0,
+        state: 'done'
+      })
+      return dest
+    } catch (err) {
+      await target.rm(tmp, { force: true }).catch(() => {})
+      activeDownloads.delete(k)
+      if (controller.signal.aborted) throw new DownloadCancelledError()
+      throw err
+    }
+  }
+
+  // ---- Local target: fetch in-process and stream to disk ----
   let res: Response
   try {
     res = await fetch(url, { redirect: 'follow', signal: controller.signal })
@@ -237,7 +311,7 @@ export async function downloadHfFile(
   // Manual reader (not 'data'+pipeline on the same stream — that races and
   // can truncate the file, producing corrupt downloads).
   const reader = (res.body as unknown as ReadableStream<Uint8Array>).getReader()
-  const out = createWriteStream(tmp)
+  const out = await target.createWriteStream(tmp)
   try {
     while (true) {
       // Check cancellation between reads so the loop exits promptly on cancel.
@@ -247,9 +321,7 @@ export async function downloadHfFile(
       const { done, value } = await reader.read()
       if (done) break
       if (value) {
-        await new Promise<void>((resolve, reject) => {
-          out.write(Buffer.from(value), (err) => (err ? reject(err) : resolve()))
-        })
+        await out.write(Buffer.from(value))
         loaded += value.byteLength
         const now = Date.now()
         if (now - lastEmit > 100) {
@@ -267,20 +339,21 @@ export async function downloadHfFile(
         }
       }
     }
-    await new Promise<void>((resolve, reject) => {
-      out.end(() => resolve())
-      out.on('error', reject)
-    })
+    await out.close()
   } catch (err) {
     // Ensure the stream & file handle are closed on any failure.
-    out.destroy()
+    try {
+      await out.close()
+    } catch {
+      /* ignore */
+    }
     try {
       await reader.cancel('cleanup')
     } catch {
       /* ignore */
     }
     // On cancellation (or any error) remove the partial file.
-    await fsp.rm(tmp, { force: true }).catch(() => {})
+    await target.rm(tmp, { force: true }).catch(() => {})
     activeDownloads.delete(k)
     throw err
   }
@@ -293,7 +366,7 @@ export async function downloadHfFile(
     )
   }
 
-  await fsp.rename(tmp, dest)
+  await target.rename(tmp, dest)
   activeDownloads.delete(k)
 
   onProgress({

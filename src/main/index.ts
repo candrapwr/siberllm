@@ -8,6 +8,8 @@ import { registerModelsIpc } from './ipc/models.ipc'
 import { registerServerIpc } from './ipc/server.ipc'
 import { registerSettingsIpc } from './ipc/settings.ipc'
 import { registerShellIpc } from './ipc/shell.ipc'
+import { registerProfilesIpc } from './ipc/profiles.ipc'
+import { disposeAllSshTargets } from './ipc/host-resolver'
 
 let mainWindow: BrowserWindow | null = null
 
@@ -112,6 +114,7 @@ function registerIpc(): void {
   registerInstallIpc(getMainWindow)
   registerModelsIpc(getMainWindow)
   registerServerIpc(getMainWindow)
+  registerProfilesIpc()
 }
 
 app.whenReady().then(async () => {
@@ -127,4 +130,9 @@ app.whenReady().then(async () => {
 
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit()
+})
+
+// Close any cached SSH connections before the app exits.
+app.on('before-quit', () => {
+  void disposeAllSshTargets()
 })

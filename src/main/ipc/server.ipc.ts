@@ -4,6 +4,7 @@ import { ipcMain, BrowserWindow } from 'electron'
 import { IPC } from '@shared/ipc-channels'
 import { serverManager } from '../services/server-manager'
 import type { ServerConfig, ServerLogLine, ServerState } from '@shared/types'
+import { resolveHost } from './host-resolver'
 
 export function registerServerIpc(getMainWindow: () => BrowserWindow | null): void {
   const win = () => getMainWindow()
@@ -21,7 +22,9 @@ export function registerServerIpc(getMainWindow: () => BrowserWindow | null): vo
     }
   )
 
-  ipcMain.handle(IPC.SERVER_START, async (_evt, config: ServerConfig) => {
+  ipcMain.handle(IPC.SERVER_START, async (_evt, profileId: string, config: ServerConfig) => {
+    const { target, paths, profile } = await resolveHost(profileId)
+    serverManager.configure(target, paths, profile)
     await serverManager.start(config)
     return serverManager.getState()
   })
@@ -32,4 +35,15 @@ export function registerServerIpc(getMainWindow: () => BrowserWindow | null): vo
   })
 
   ipcMain.handle(IPC.SERVER_STATUS, async () => serverManager.getState())
+
+  // Probe whether a server is already running on the target at a port; if so,
+  // adopt it (status=running, tail its log). Used on app load / profile switch.
+  ipcMain.handle(
+    IPC.SERVER_PROBE,
+    async (_evt, profileId: string, port: number) => {
+      const { target, paths, profile } = await resolveHost(profileId)
+      serverManager.configure(target, paths, profile)
+      return serverManager.probeStatus(port)
+    }
+  )
 }

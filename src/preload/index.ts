@@ -7,10 +7,13 @@ import type {
   InstallStatus,
   InstallProgress,
   ModelDownloadProgress,
+  Profile,
+  ProfileTestResult,
   ScanResult,
   ServerConfig,
   ServerLogLine,
-  ServerState
+  ServerState,
+  SshProfileInput
 } from '@shared/types'
 import type { CatalogModel } from '@shared/constants'
 import type { GpuBackend } from '@shared/platforms'
@@ -18,9 +21,10 @@ import type { GpuBackend } from '@shared/platforms'
 const api = {
   // ---------- install ----------
   install: {
-    check: (): Promise<InstallStatus> => ipcRenderer.invoke(IPC.INSTALL_CHECK),
-    start: (backend?: GpuBackend | 'auto'): Promise<void> =>
-      ipcRenderer.invoke(IPC.INSTALL_START, backend),
+    check: (profileId?: string): Promise<InstallStatus> =>
+      ipcRenderer.invoke(IPC.INSTALL_CHECK, profileId),
+    start: (backend: GpuBackend | 'auto' | undefined, profileId?: string): Promise<void> =>
+      ipcRenderer.invoke(IPC.INSTALL_START, backend, profileId),
     onProgress: (cb: (p: InstallProgress) => void): (() => void) =>
       subscribe(IPC.INSTALL_PROGRESS, cb),
     onDone: (cb: (p: InstallProgress) => void): (() => void) =>
@@ -31,22 +35,23 @@ const api = {
 
   // ---------- models ----------
   models: {
-    scan: (): Promise<ScanResult> => ipcRenderer.invoke(IPC.MODELS_SCAN),
+    scan: (profileId?: string): Promise<ScanResult> =>
+      ipcRenderer.invoke(IPC.MODELS_SCAN, profileId),
     catalog: (): Promise<CatalogModel[]> => ipcRenderer.invoke(IPC.MODELS_CATALOG),
-    delete: (path: string): Promise<ScanResult> =>
-      ipcRenderer.invoke(IPC.MODELS_DELETE, path),
-    addFolder: (folder: string): Promise<ScanResult> =>
-      ipcRenderer.invoke(IPC.MODELS_ADD_FOLDER, folder),
+    delete: (profileId: string, path: string): Promise<ScanResult> =>
+      ipcRenderer.invoke(IPC.MODELS_DELETE, profileId, path),
+    addFolder: (profileId: string, folder: string): Promise<ScanResult> =>
+      ipcRenderer.invoke(IPC.MODELS_ADD_FOLDER, profileId, folder),
     pickFolder: (): Promise<string | null> =>
       ipcRenderer.invoke(IPC.MODELS_PICK_FOLDER),
-    importFiles: (): Promise<{ imported: number; scan: ScanResult }> =>
-      ipcRenderer.invoke(IPC.MODELS_IMPORT_FILES),
+    importFiles: (profileId?: string): Promise<{ imported: number; scan: ScanResult }> =>
+      ipcRenderer.invoke(IPC.MODELS_IMPORT_FILES, profileId),
     searchHf: (query: string, limit?: number) =>
       ipcRenderer.invoke(IPC.MODELS_SEARCH_HF, query, limit),
     listRepoFiles: (repo: string): Promise<import('@shared/types').RepoFile[]> =>
       ipcRenderer.invoke(IPC.MODELS_LIST_REPO, repo),
-    download: (repo: string, file: string): Promise<ScanResult> =>
-      ipcRenderer.invoke(IPC.MODELS_DOWNLOAD_START, repo, file),
+    download: (profileId: string, repo: string, file: string): Promise<ScanResult> =>
+      ipcRenderer.invoke(IPC.MODELS_DOWNLOAD_START, profileId, repo, file),
     cancelDownload: (repo: string, file: string): Promise<boolean> =>
       ipcRenderer.invoke(IPC.MODELS_CANCEL_DOWNLOAD, repo, file),
     onDownloadProgress: (cb: (p: ModelDownloadProgress) => void): (() => void) =>
@@ -60,10 +65,12 @@ const api = {
 
   // ---------- server ----------
   server: {
-    start: (config: ServerConfig): Promise<ServerState> =>
-      ipcRenderer.invoke(IPC.SERVER_START, config),
+    start: (profileId: string, config: ServerConfig): Promise<ServerState> =>
+      ipcRenderer.invoke(IPC.SERVER_START, profileId, config),
     stop: (): Promise<ServerState> => ipcRenderer.invoke(IPC.SERVER_STOP),
     status: (): Promise<ServerState> => ipcRenderer.invoke(IPC.SERVER_STATUS),
+    probe: (profileId: string, port: number): Promise<ServerState> =>
+      ipcRenderer.invoke(IPC.SERVER_PROBE, profileId, port),
     onLog: (cb: (line: ServerLogLine) => void): (() => void) =>
       subscribe(IPC.SERVER_LOG, cb),
     onStatus: (cb: (state: ServerState) => void): (() => void) =>
@@ -79,6 +86,22 @@ const api = {
     get: (): Promise<AppSettings> => ipcRenderer.invoke(IPC.SETTINGS_GET),
     set: (patch: Partial<AppSettings>): Promise<AppSettings> =>
       ipcRenderer.invoke(IPC.SETTINGS_SET, patch)
+  },
+
+  // ---------- profiles (target machines: local + SSH remotes) ----------
+  profiles: {
+    list: (): Promise<{ profiles: Profile[]; selectedId: string }> =>
+      ipcRenderer.invoke(IPC.PROFILES_LIST),
+    create: (input: SshProfileInput): Promise<Profile[]> =>
+      ipcRenderer.invoke(IPC.PROFILES_CREATE, input),
+    update: (id: string, patch: Partial<SshProfileInput>): Promise<Profile[]> =>
+      ipcRenderer.invoke(IPC.PROFILES_UPDATE, id, patch),
+    remove: (id: string): Promise<Profile[]> =>
+      ipcRenderer.invoke(IPC.PROFILES_DELETE, id),
+    select: (id: string): Promise<string> =>
+      ipcRenderer.invoke(IPC.PROFILES_SELECT, id),
+    test: (id: string): Promise<ProfileTestResult> =>
+      ipcRenderer.invoke(IPC.PROFILES_TEST, id)
   },
 
   // ---------- shell ----------

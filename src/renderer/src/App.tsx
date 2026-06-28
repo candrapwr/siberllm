@@ -5,16 +5,18 @@ import { useInstallStore } from './store/install'
 import { api } from './lib/api'
 import { useTranslation } from 'react-i18next'
 import { LanguageSwitcher } from './components/LanguageSwitcher'
+import { ProfileSelector } from './components/ProfileSelector'
 import logo from './assets/logo.png'
 import Setup from './pages/Setup'
 import Models from './pages/Models'
 import Run from './pages/Run'
 import Logs from './pages/Logs'
 import Settings from './pages/Settings'
+import Profiles from './pages/Profiles'
 import { cn } from './lib/utils'
 
 // Routes always accessible regardless of engine install state.
-const OPEN_ROUTES = new Set(['/setup', '/settings'])
+const OPEN_ROUTES = new Set(['/setup', '/settings', '/profiles'])
 
 export default function App() {
   const { status, refresh } = useInstallStore()
@@ -32,12 +34,13 @@ export default function App() {
     { to: '/models', label: t('nav.models'), icon: '◇' },
     { to: '/run', label: t('nav.run'), icon: '▶' },
     { to: '/logs', label: t('nav.logs'), icon: '≡' },
+    { to: '/profiles', label: t('nav.profiles'), icon: '⧉' },
     { to: '/settings', label: t('nav.settings'), icon: '✦' }
   ]
 
   return (
     <div className="flex h-screen w-screen overflow-hidden bg-background text-foreground">
-      <aside className="flex w-16 flex-col items-center gap-2 border-r border-border py-4 lg:w-56 lg:items-stretch lg:px-3">
+      <aside className="flex w-20 flex-col items-center gap-2 border-r border-border py-4 lg:w-64 lg:items-stretch lg:px-3">
         <div className="mb-4 flex items-center gap-2 px-2 lg:px-0">
           <img
             src={logo}
@@ -49,6 +52,9 @@ export default function App() {
 
         {/* Language switcher — visible at the top of the sidebar */}
         <LanguageSwitcher />
+
+        {/* Active target machine picker (Local or SSH remote) */}
+        <ProfileSelector />
 
         <nav className="flex flex-1 flex-col gap-1">
           {NAV.map((n) => {
@@ -87,6 +93,7 @@ export default function App() {
           <Route path="/" element={<Navigate to="/setup" replace />} />
           <Route path="/setup" element={<Setup />} />
           <Route path="/settings" element={<Settings />} />
+          <Route path="/profiles" element={<Profiles />} />
           {/* Engine-required routes are guarded: redirected to /setup
               until llama.cpp is installed. */}
           <Route
