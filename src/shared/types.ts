@@ -96,6 +96,63 @@ export interface ServerLogLine {
   line: string
 }
 
+// ----------------------------- profiles -----------------------------
+//
+// A "profile" is the target machine where the engine runs and where models
+// live. The Local profile (id: LOCAL_PROFILE_ID) always exists and cannot be
+// removed. SSH profiles point at a remote machine reached over SSH.
+//
+// NOTE on password storage: passwords are obfuscated (NOT securely encrypted)
+// so they are not stored as plaintext in config.json. Real secret storage
+// (OS keychain) is on the roadmap. Treat the obfuscation as a mild deterrent
+// only.
+
+export const LOCAL_PROFILE_ID = 'local'
+
+/** Discriminated union: kind is the discriminator. */
+export type Profile = LocalProfile | SshProfile
+
+export interface LocalProfile {
+  id: typeof LOCAL_PROFILE_ID
+  name: string
+  kind: 'local'
+}
+
+export type SshAuthMethod = 'password'
+
+export interface SshProfile {
+  id: string
+  name: string
+  kind: 'ssh'
+  host: string
+  port: number
+  username: string
+  authMethod: SshAuthMethod
+  /** Obfuscated password (use obfuscatePassword/deobfuscatePassword). Empty if unset. */
+  passwordEnc: string
+  /** Absolute dir on the remote where .gguf models live. */
+  remoteModelsDir: string
+  /** Absolute dir on the remote where the llama.cpp binary lives. */
+  remoteBinDir: string
+}
+
+/** Input shape for creating a new SSH profile (no id / no obfuscated pw yet). */
+export interface SshProfileInput {
+  name: string
+  host: string
+  port: number
+  username: string
+  password: string // plaintext, obfuscated before persistence
+  remoteModelsDir: string
+  remoteBinDir: string
+}
+
+/** Payload returned by a connection test. */
+export interface ProfileTestResult {
+  ok: boolean
+  message: string
+}
+
 // ----------------------------- settings -----------------------------
 
 export interface AppSettings {
@@ -107,6 +164,17 @@ export interface AppSettings {
   defaultGpuLayers: number
   extraArgs: string
   extraModelFolders: string[]
+  /** All profiles (Local is always present at index 0). */
+  profiles: Profile[]
+  /** Currently active profile id. Defaults to LOCAL_PROFILE_ID. */
+  selectedProfileId: string
+}
+
+/** The Local profile, always present and non-deletable. */
+export const LOCAL_PROFILE: LocalProfile = {
+  id: LOCAL_PROFILE_ID,
+  name: 'Local',
+  kind: 'local'
 }
 
 export const DEFAULT_SETTINGS: AppSettings = {
@@ -117,5 +185,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   defaultContextSize: 8192,
   defaultGpuLayers: -1,
   extraArgs: '--jinja',
-  extraModelFolders: []
+  extraModelFolders: [],
+  profiles: [LOCAL_PROFILE],
+  selectedProfileId: LOCAL_PROFILE_ID
 }

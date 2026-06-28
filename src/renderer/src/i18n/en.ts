@@ -17,6 +17,7 @@ export const en: typeof id = {
     models: 'Model',
     run: 'Run',
     logs: 'Logs',
+    profiles: 'Profiles',
     settings: 'Settings',
     lockedHint: 'Install the llama.cpp engine in the Setup tab first'
   },
@@ -64,6 +65,7 @@ export const en: typeof id = {
     tabLocal: 'Local',
     tabDownload: 'Download',
     detected: '{{count}} .gguf file(s) detected',
+    scanning: 'Scanning target machine…',
     importFile: '+ Import file',
     addFolder: '+ Add folder',
     refresh: 'Refresh',
@@ -103,6 +105,7 @@ export const en: typeof id = {
   run: {
     title: 'Run Server',
     desc: 'Start llama-server as an OpenAI-compatible API.',
+    loadingTarget: 'Connecting to target machine & checking server…',
     config: 'Configuration',
     configDesc: 'Pick a model and server parameters.',
     selectModel: '— select a model —',
@@ -123,6 +126,7 @@ export const en: typeof id = {
     start: 'Start',
     starting: 'Starting…',
     stop: 'Stop',
+    stopping: 'Stopping…',
     startingMsg: 'Starting server…',
     startingDesc: 'Loading the model into memory & waiting for the server to be ready. For large models this can take tens of seconds. See progress in the Logs tab.',
     serverReady: 'Server ready at',
@@ -176,6 +180,38 @@ export const en: typeof id = {
     label: 'Language',
     id: 'Indonesia',
     en: 'English'
+  },
+
+  // ---- profiles (target machines: Local + SSH remotes) ----
+  profiles: {
+    title: 'Profiles',
+    desc: 'The target machine where the engine runs and models are stored.',
+    listTitle: 'Profiles',
+    listDesc: 'The Local profile always exists and cannot be removed. Add an SSH profile to run the engine on a remote machine.',
+    localProfile: 'Local',
+    active: 'active',
+    use: 'Use',
+    edit: 'Edit',
+    delete: 'Delete',
+    test: 'Test connection',
+    testing: 'Testing…',
+    addSsh: '+ Add SSH profile',
+    editSsh: 'Edit SSH profile',
+    name: 'Name',
+    host: 'Host',
+    port: 'SSH port',
+    username: 'Username',
+    password: 'Password',
+    passwordHint: 'Stored with basic obfuscation (not strong encryption).',
+    passwordPlaceholder: '••••••••',
+    remoteModelsDir: 'Remote models folder',
+    remoteBinDir: 'Remote engine binary folder',
+    securityNote: 'The password is stored with basic obfuscation in config. For full security, use an SSH key (roadmap).',
+    save: 'Save',
+    saving: 'Saving…',
+    cancel: 'Cancel',
+    switchTitle: 'Switch active target machine',
+    manage: 'Manage profiles…'
   }
 }
 

@@ -1,53 +1,64 @@
-// Detect the best available GPU backend for the host machine.
+// Detect the best available GPU backend for a target machine.
+//
+// All probes run ON the target (via HostTarget.exec / .exists), so this works
+// identically for the local machine and for an SSH remote.
 
-import { execFile } from 'node:child_process'
-import { promisify } from 'node:util'
-import { existsSync } from 'node:fs'
 import { normalizePlatform, type GpuBackend, type PlatformInfo } from '@shared/platforms'
+import type { HostTarget } from './host/types'
+import { localTarget } from './host/local-target'
 
-const pexecFile = promisify(execFile)
+/** Map a HostTarget platform tuple to the node-style platform id. */
+function nodeOsFrom(o: NodeJS.Platform | 'linux' | 'darwin' | 'win32'): NodeJS.Platform {
+  if (o === 'darwin') return 'darwin'
+  if (o === 'win32') return 'win32'
+  return 'linux'
+}
 
-async function commandExists(cmd: string): Promise<boolean> {
+async function commandExists(target: HostTarget, cmd: string): Promise<boolean> {
   try {
-    if (process.platform === 'win32') {
-      await pexecFile('where', [cmd], { windowsHide: true })
-    } else {
-      await pexecFile('which', [cmd])
+    const plat = await target.platform()
+    if (plat.os === 'win32') {
+      const r = await target.exec('where', [cmd], { windowsHide: true })
+      return r.code === 0 || r.stdout.trim().length > 0
     }
-    return true
+    const r = await target.exec('which', [cmd])
+    return r.code === 0 || r.stdout.trim().length > 0
   } catch {
     return false
   }
 }
 
-async function hasNvidia(): Promise<boolean> {
-  // nvidia-smi presence is a reliable CUDA-available signal on win/linux.
-  if (await commandExists('nvidia-smi')) return true
-  if (process.platform === 'linux' && existsSync('/dev/nvidia0')) return true
+async function hasNvidia(target: HostTarget): Promise<boolean> {
+  if (await commandExists(target, 'nvidia-smi')) return true
+  const plat = await target.platform()
+  if (plat.os === 'linux' && (await target.exists('/dev/nvidia0'))) return true
   return false
 }
 
-async function hasAmd(): Promise<boolean> {
-  if (process.platform === 'linux') {
-    return existsSync('/dev/kfd') || existsSync('/dev/dri/renderD128')
+async function hasAmd(target: HostTarget): Promise<boolean> {
+  const plat = await target.platform()
+  if (plat.os === 'linux') {
+    return (await target.exists('/dev/kfd')) || (await target.exists('/dev/dri/renderD128'))
   }
   // windows: amd-adl detection is brittle; we treat as vulkan candidate
   return false
 }
 
 /** Detect the recommended backend. macOS always uses Metal. */
-export async function detectBackend(): Promise<GpuBackend> {
-  if (process.platform === 'darwin') return 'metal'
+export async function detectBackend(target: HostTarget = localTarget): Promise<GpuBackend> {
+  const plat = await target.platform()
+  if (plat.os === 'darwin') return 'metal'
 
-  if (await hasNvidia()) return 'cuda'
-  if (await hasAmd()) return 'vulkan' // safer than rocm for prebuilt availability
+  if (await hasNvidia(target)) return 'cuda'
+  if (await hasAmd(target)) return 'vulkan' // safer than rocm for prebuilt availability
 
   // fall back: try vulkan via generic GPU, else cpu
   return 'cpu'
 }
 
 /** Build the full PlatformInfo using detected backend. */
-export async function detectPlatform(): Promise<PlatformInfo> {
-  const backend = await detectBackend()
-  return normalizePlatform(process.platform, process.arch, backend)
+export async function detectPlatform(target: HostTarget = localTarget): Promise<PlatformInfo> {
+  const plat = await target.platform()
+  const backend = await detectBackend(target)
+  return normalizePlatform(nodeOsFrom(plat.os), plat.arch as 'arm64' | 'x64', backend)
 }
