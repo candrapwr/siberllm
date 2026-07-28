@@ -1,6 +1,24 @@
-# SiberLLM
+<div align="center">
 
-**Run local AI models on your own machine — privately, simply.**
+# 🦙 SiberLLM
+
+**Jalankan model AI lokal di komputermu sendiri — privat, sederhana.**
+
+Satu aplikasi desktop untuk install engine, unduh model, dan menjalankan server API lokal — tanpa cloud, tanpa API key, tanpa data keluar dari mesinmu.
+
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](./LICENSE)
+[![Engine](https://img.shields.io/badge/engine-llama.cpp-0064B6?logo=llama&logoColor=white)](https://github.com/ggml-org/llama.cpp)
+[![Electron](https://img.shields.io/badge/Electron-desktop-47848F?logo=electron&logoColor=white)](https://www.electronjs.org/)
+[![Platforms](https://img.shields.io/badge/platforms-macOS·Windows·Linux-lightgrey.svg)](#️-supported-platforms)
+[![Privacy](https://img.shields.io/badge/privacy-100%25_local-success.svg)](#-faq)
+[![Release](https://img.shields.io/github/v/release/candrapwr/siberllm?display_name=tag&include_prereleases)](https://github.com/candrapwr/siberllm/releases)
+[![Stars](https://img.shields.io/github/stars/candrapwr/siberllm?style=social&label=Star)](https://github.com/candrapwr/siberllm/stargazers)
+
+</div>
+
+---
+
+> 🌐 Bagian dari **Ekosistem Siber** — dibangun & dirawat oleh **dataSiberLab**.
 
 SiberLLM is a desktop application that lets you run large language models (LLMs)
 and multimodal vision models entirely on your own computer, with no cloud, no API
@@ -150,11 +168,24 @@ remembered across launches.
 ## 📝 License
 
 MIT — SiberLLM is free and open source. It is built on top of the amazing
-[llama.cpp](https://github.com/ggml-org/llama.cpp) project.
-
-Made with care by **datasiberLab** — [candrapwr@datasiber.com](mailto:candrapwr@datasiber.com).
+[llama.cpp](https://github.com/ggml-org/llama.cpp) project. See [LICENSE](./LICENSE).
 
 ---
 
 For development, architecture, and contributing details, see
 [DEVELOPMENT.md](./DEVELOPMENT.md).
+
+---
+
+## 📬 Kontak & Komunitas
+
+<div align="center">
+
+**Dibuat dengan ❤️ oleh [dataSiberLab](https://datasiber.com)** sebagai bagian dari ekosistem Siber.
+
+📧 **Kontak:** [candrapwr@datasiber.com](mailto:candrapwr@datasiber.com)
+🌐 **Website:** [datasiber.com](https://datasiber.com)
+
+SiberLLM membantu? ⭐ Star repo-nya dan bagikan ke sesama builder!
+
+</div>
