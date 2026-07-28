@@ -189,3 +189,5 @@ For development, architecture, and contributing details, see
 SiberLLM membantu? ⭐ Star repo-nya dan bagikan ke sesama builder!
 
 </div>
+
+<!-- repo: siberllm · dataSiberLab · 2026 -->
